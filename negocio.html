@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Negocio - TurnoRD</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 text-gray-800">
+  <div class="flex min-h-screen">
+    <!-- Sidebar -->
+    <aside class="w-64 bg-blue-900 text-white p-6 hidden md:block">
+      <h2 class="text-2xl font-bold mb-8">TurnoRD Admin</h2>
+      <nav class="space-y-4">
+       <a href="panel.html" class="block hover:text-blue-300">Inicio</a>
+       <a href="turno.html" class="block hover:text-blue-300">Turnos</a>
+       <a href="negocio.html" class="block text-blue-300 font-semibold">Mi negocio</a>
+        <a href="#" class="block hover:text-blue-300">Configuración</a>
+        <a href="/cierre.html" id="cerrarSesion" class="block hover:text-red-400 mt-6">Cerrar sesión</a>
+
+      </nav>
+    </aside>
+
+    <!-- Contenido principal -->
+    <main class="flex-1 p-6 space-y-8">
+
+      <!-- Historial de ingresos -->
+      <section class="bg-white p-6 rounded-xl shadow">
+        <h2 class="text-2xl font-bold mb-4">📊 Historial de ingresos</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          <div class="bg-green-100 p-4 rounded-lg">
+            <p class="text-lg font-medium">Ganancia del Día</p>
+            <p class="text-2xl font-bold text-green-700">$1,500</p>
+          </div>
+          <div class="bg-blue-100 p-4 rounded-lg">
+            <p class="text-lg font-medium">Ganancia Semanal</p>
+            <p class="text-2xl font-bold text-blue-700">$9,500</p>
+          </div>
+          <div class="bg-purple-100 p-4 rounded-lg">
+            <p class="text-lg font-medium">Ganancia Mensual</p>
+            <p class="text-2xl font-bold text-purple-700">$32,000</p>
+          </div>
+        </div>
+        <button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Exportar a Excel</button>
+        <button class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 ml-2">Exportar a PDF</button>
+      </section>
+
+      <!-- Configuración de horario y cierre automático -->
+      <section class="bg-white p-6 rounded-xl shadow">
+        <h2 class="text-2xl font-bold mb-4">🕒 Configuración de Horario</h2>
+        <form class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block font-medium mb-1">Hora de apertura:</label>
+            <input type="time" class="w-full border px-3 py-2 rounded" value="08:00" />
+          </div>
+          <div>
+            <label class="block font-medium mb-1">Hora de cierre:</label>
+            <input type="time" class="w-full border px-3 py-2 rounded" value="20:00" />
+          </div>
+          <div>
+            <label class="block font-medium mb-1">Límite de turnos por día:</label>
+            <input type="number" class="w-full border px-3 py-2 rounded" value="30" />
+          </div>
+          <div class="flex items-end">
+            <button class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Guardar configuración</button>
+          </div>
+        </form>
+      </section>
+
+      <!-- Control de sucursales -->
+      <section class="bg-white p-6 rounded-xl shadow">
+        <h2 class="text-2xl font-bold mb-4">🏢 Control de Sucursales</h2>
+        <form class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <div>
+            <label class="block font-medium mb-1">Seleccionar sucursal:</label>
+            <select class="w-full border px-3 py-2 rounded">
+              <option>Sucursal Centro</option>
+              <option>Sucursal Norte</option>
+              <option>Sucursal Sur</option>
+            </select>
+          </div>
+          <div class="flex items-end">
+            <button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Ver estadísticas</button>
+          </div>
+        </form>
+
+        <h3 class="text-xl font-semibold mb-2">Horarios y Servicios por Sucursal</h3>
+        <table class="min-w-full text-left border">
+          <thead>
+            <tr>
+              <th class="py-2 px-4 border-b">Sucursal</th>
+              <th class="py-2 px-4 border-b">Horario</th>
+              <th class="py-2 px-4 border-b">Servicios</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="py-2 px-4 border-b">Sucursal Centro</td>
+              <td class="py-2 px-4 border-b">8:00 AM - 8:00 PM</td>
+              <td class="py-2 px-4 border-b">Corte, Barba, Diseño</td>
+            </tr>
+            <tr>
+              <td class="py-2 px-4 border-b">Sucursal Norte</td>
+              <td class="py-2 px-4 border-b">9:00 AM - 6:00 PM</td>
+              <td class="py-2 px-4 border-b">Peinado, Coloración</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+    </main>
+  </div>
+  <script src="/negocio.js"></script>
+</body>
+</html>

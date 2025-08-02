@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gestión de Turnos - TurnoRD</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 text-gray-800">
+  <div class="flex min-h-screen">
+    <!-- Sidebar -->
+    <aside class="w-64 bg-blue-900 text-white p-6 hidden md:block">
+      <h2 class="text-2xl font-bold mb-8">TurnoRD Admin</h2>
+      <nav class="space-y-4">
+        <a href="panel.html" class="block hover:text-blue-300">Inicio</a>
+        <a href="turno.html" class="block hover:text-blue-300">Turnos</a>
+        <a href="negocio.html" class="block text-blue-300 font-semibold">Mi negocio</a>
+        <a href="#" class="block hover:text-blue-300">Configuración</a>
+        <a href="/cierre.html" id="cerrarSesion" class="block hover:text-red-400 mt-6">Cerrar sesión</a>
+      </nav>
+    </aside>
+
+    <!-- Contenido principal -->
+    <main class="flex-1 p-6 space-y-6">
+      <h1 class="text-2xl font-bold mb-4">Gestión de Turnos</h1>
+
+      <!-- Turno actual -->
+      <div class="bg-white p-4 rounded-xl shadow text-center">
+        <h2 class="text-xl font-semibold text-gray-700">Turno Actual</h2>
+        <p id="turnoActual" class="text-5xl font-bold text-blue-700 mt-2">A01</p>
+      </div>
+
+      <!-- Botones -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <button onclick="devolverTurno()" class="bg-red-500 hover:bg-red-600 text-white py-3 rounded-xl font-semibold">
+          Devolver Turno
+        </button>
+        <button onclick="abrirModalCobro()" class="bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-semibold">
+          Avanzar Turno
+        </button>
+        <button onclick="abrirModal()" class="bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-semibold">
+          Tomar Turno Manual
+        </button>
+      </div>
+
+      <!-- Modal para nuevo turno -->
+      <div id="modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white p-6 rounded-xl w-full max-w-md shadow-xl">
+          <h2 class="text-xl font-bold mb-4">Reservar Turno</h2>
+          <form id="formTurno" onsubmit="tomarTurno(event)">
+            <div class="mb-4">
+              <label class="block font-medium">Nombre</label>
+              <input type="text" id="nombre" required class="w-full border px-3 py-2 rounded" />
+            </div>
+            <div class="mb-4">
+              <label class="block font-medium">Teléfono</label>
+              <input type="tel" id="telefono" required class="w-full border px-3 py-2 rounded" />
+            </div>
+            <div class="mb-4">
+              <label class="block font-medium">Servicio</label>
+              <select id="servicio" required class="w-full border px-3 py-2 rounded">
+                <option value="">Seleccione</option>
+                <option value="Barbería">Barbería</option>
+              </select>
+            </div>
+            <div class="flex justify-end space-x-2">
+              <button type="button" onclick="cerrarModal()" class="bg-gray-300 px-4 py-2 rounded">Cancelar</button>
+              <button type="submit" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded">Guardar</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Modal de cobro -->
+      <div id="modalCobro" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white p-6 rounded-xl w-full max-w-sm shadow-xl">
+          <h2 class="text-xl font-bold mb-4">💵 Ingresar cobro</h2>
+          <form id="formCobro" onsubmit="guardarCobro(event)">
+            <label class="block font-medium mb-1">Monto cobrado:</label>
+            <input type="number" id="montoCobrado" required class="w-full border px-3 py-2 rounded mb-4" min="0" />
+            <div class="flex justify-end space-x-2">
+              <button type="button" onclick="cerrarModalCobro()" class="bg-gray-300 px-4 py-2 rounded">Cancelar</button>
+              <button type="submit" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded">Guardar e Avanzar</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Lista de turnos en espera -->
+      <div class="bg-white p-4 rounded-xl shadow">
+        <h2 class="text-xl font-semibold mb-4">Turnos en Espera</h2>
+        <div id="listaEspera" class="flex flex-wrap gap-4">
+          <!-- Turnos agregados aparecerán aquí -->
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="turno.js"></script>
+</body>
+</html>
