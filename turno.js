@@ -1,123 +1,192 @@
-let contador = 1;
-let turnos = ["A01"];
-let turnoActual = "A01";
+import { supabase } from './database.js';
 
-function actualizarTurnoActual() {
-  document.getElementById("turnoActual").textContent = turnoActual;
-}
+const negocioId = 'barberia0001';
+let turnoActual = null;
 
-function abrirModal() {
-  document.getElementById("modal").classList.remove("hidden");
-}
-
-function cerrarModal() {
-  document.getElementById("modal").classList.add("hidden");
-  document.getElementById("formTurno").reset();
-}
-
-function abrirModalCobro() {
-  document.getElementById('modalCobro').classList.remove('hidden');
-}
-
-function cerrarModalCobro() {
-  document.getElementById('modalCobro').classList.add('hidden');
-  document.getElementById('montoCobrado').value = '';
-}
-
-function tomarTurno(e) {
-  e.preventDefault();
+// Tomar turno manual desde el modal
+async function tomarTurno(event) {
+  event.preventDefault();
+  console.log("tomarTurno llamada");
 
   const nombre = document.getElementById('nombre').value.trim();
   const telefono = document.getElementById('telefono').value.trim();
   const servicio = document.getElementById('servicio').value;
 
-  if (!nombre || !telefono || !servicio) {
-    alert('Completa todos los campos');
+  const turnoGenerado = await generarNuevoTurno();
+
+  const ahora = new Date();
+const horaStr = ahora.toLocaleTimeString('es-ES', { hour12: false });  // formato 24h "HH:mm:ss"
+
+
+  const { error } = await supabase.from('turnos').insert([{
+  negocio_id: negocioId,
+  turno: turnoGenerado,
+  nombre: nombre,
+  telefono: telefono,
+  servicio: servicio,
+  estado: 'En espera',
+  hora: horaStr    // enviamos la hora
+}]);
+
+
+  if (error) {
+    alert('Error al guardar turno: ' + error.message);
+    console.error(error);
     return;
   }
 
-  contador++;
-  const nuevoTurno = `A${contador.toString().padStart(2, "0")}`;
-  turnos.push(nuevoTurno);
-  agregarTurnoVisual(nuevoTurno, nombre, servicio);
-  guardarHistorialTurno(nuevoTurno, nombre, servicio);
-  if (turnos.length === 1) turnoActual = nuevoTurno;
-  actualizarTurnoActual();
   cerrarModal();
+  alert(`✅ Turno ${turnoGenerado} registrado para ${nombre}`);
+  await cargarTurnos();
 }
 
-function agregarTurnoVisual(turno, nombre, servicio) {
-  const tiempoEspera = (turnos.indexOf(turno)) * 20;
+// Generar el próximo turno disponible
+async function generarNuevoTurno() {
+  const { data, error } = await supabase
+    .from('turnos')
+    .select('turno')
+    .eq('negocio_id', negocioId)
+    .order('created_at', { ascending: false })  // Orden descendente para obtener último registro
+    .limit(1);
 
-  const div = document.createElement("div");
-  div.className =
-    "bg-green-100 border border-green-400 text-green-700 px-4 py-2 rounded-xl text-left shadow";
-  div.innerHTML = `
-    <div><strong>${turno}</strong> - ${nombre} (${servicio})</div>
-    <div class="text-sm">Tiempo estimado: ${tiempoEspera} min</div>
-  `;
-  document.getElementById("listaEspera").appendChild(div);
-}
-
-function guardarHistorialTurno(turno, nombre, servicio) {
-  const hora = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  const historial = JSON.parse(localStorage.getItem("historialTurnos")) || [];
-  historial.push({ turno, cliente: nombre, servicio, hora, estado: "En espera" });
-  localStorage.setItem("historialTurnos", JSON.stringify(historial));
-}
-
-function avanzarTurno() {
-  if (turnos.length > 1) {
-    const turnoAtendido = turnos.shift();
-    turnoActual = turnos[0];
-    actualizarTurnoActual();
-    document.getElementById("listaEspera").removeChild(document.getElementById("listaEspera").firstElementChild);
-
-    const historial = JSON.parse(localStorage.getItem("historialTurnos")) || [];
-    const index = historial.findIndex(t => t.turno === turnoAtendido);
-    if (index !== -1) {
-      historial[index].estado = "Atendido";
-      localStorage.setItem("historialTurnos", JSON.stringify(historial));
-    }
+  if (error) {
+    console.error('Error al generar turno:', error.message);
+    return 'A01';
   }
+
+  if (!data || data.length === 0) return 'A01';
+
+  const ultimo = data[0].turno;
+  const letra = ultimo.charAt(0);
+  const numero = parseInt(ultimo.substring(1)) + 1;
+  const nuevoTurno = `${letra}${numero.toString().padStart(2, '0')}`;
+  console.log("Nuevo turno generado:", nuevoTurno);
+  return nuevoTurno;
 }
 
-function devolverTurno() {
-  const anterior = `A${(parseInt(turnoActual.slice(1)) - 1).toString().padStart(2, "0")}`;
-  if (!turnos.includes(anterior)) {
-    turnos.unshift(anterior);
-    const div = document.createElement("div");
-    div.textContent = anterior;
-    div.className =
-      "bg-red-100 border border-red-400 text-red-700 px-4 py-2 rounded-xl text-center min-w-[60px]";
-    document.getElementById("listaEspera").prepend(div);
-    turnoActual = anterior;
-    actualizarTurnoActual();
-  }
-}
+// Cargar turnos en espera
+async function cargarTurnos() {
+  console.log("cargarTurnos llamada");
 
-function guardarCobro(event) {
-  event.preventDefault();
-  const monto = parseFloat(document.getElementById('montoCobrado').value);
-  if (isNaN(monto) || monto <= 0) {
-    alert('Ingresa un monto válido');
+  const { data, error } = await supabase
+    .from('turnos')
+    .select('*')
+    .eq('estado', 'En espera')
+    .eq('negocio_id', negocioId)
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    console.error('Error al cargar turnos:', error.message);
     return;
   }
 
-  let historial = JSON.parse(localStorage.getItem('historialIngresos')) || {
-    dia: 0,
-    semana: 0,
-    mes: 0,
-  };
+  const lista = document.getElementById('listaEspera');
+  lista.innerHTML = '';
 
-  historial.dia += monto;
-  historial.semana += monto;
-  historial.mes += monto;
+  data.forEach(t => {
+    const div = document.createElement('div');
+    div.className = 'bg-blue-100 text-blue-900 p-3 rounded-lg shadow';
+    div.innerHTML = `<strong>${t.turno}</strong><br>${t.cliente || ''}`;
+    lista.appendChild(div);
+  });
 
-  localStorage.setItem('historialIngresos', JSON.stringify(historial));
-  cerrarModalCobro();
-  avanzarTurno();
+  turnoActual = data.length > 0 ? data[0] : null;
+  document.getElementById('turnoActual').textContent = turnoActual ? turnoActual.turno : '--';
+  console.log("Turno actual:", turnoActual);
 }
 
-// Al cargar
-actualizarTurnoActual();
+// Modal para tomar turno
+function abrirModal() {
+  console.log("abrirModal llamada");
+  document.getElementById('modal').classList.remove('hidden');
+}
+
+function cerrarModal() {
+  console.log("cerrarModal llamada");
+  document.getElementById('modal').classList.add('hidden');
+  document.getElementById('formTurno').reset();
+}
+
+// Modal de cobro
+function abrirModalCobro() {
+  console.log("abrirModalCobro llamada");
+  if (!turnoActual) {
+    alert('No hay turno en espera.');
+    return;
+  }
+  document.getElementById('modalCobro').classList.remove('hidden');
+}
+
+function cerrarModalCobro() {
+  console.log("cerrarModalCobro llamada");
+  document.getElementById('modalCobro').classList.add('hidden');
+  document.getElementById('formCobro').reset();
+}
+
+// Guardar el cobro e indicar que el turno fue atendido
+async function guardarCobro(event) {
+  event.preventDefault();
+  console.log("guardarCobro llamada");
+
+  const monto = parseFloat(document.getElementById('montoCobrado').value);
+  if (!turnoActual) return;
+
+  const { error } = await supabase
+    .from('turnos')
+    .update({
+      estado: 'Atendido',
+      monto_cobrado: monto
+    })
+    .eq('id', turnoActual.id);
+
+  if (error) {
+    alert('Error al guardar cobro: ' + error.message);
+    console.error(error);
+    return;
+  }
+
+  cerrarModalCobro();
+  alert(`✅ Turno ${turnoActual.turno} finalizado con cobro de RD$${monto}`);
+  await cargarTurnos();
+}
+
+// Devolver turno al final de la cola
+async function devolverTurno() {
+  console.log("devolverTurno llamada");
+  if (!turnoActual) {
+    alert('No hay turno que devolver.');
+    return;
+  }
+
+  // Cambiamos estado a 'Devuelto' para indicar que se pone al final
+  const { error } = await supabase
+    .from('turnos')
+    .update({ estado: 'Devuelto' })
+    .eq('id', turnoActual.id);
+
+  if (error) {
+    alert('Error al devolver turno: ' + error.message);
+    console.error(error);
+    return;
+  }
+
+  alert(`🔁 Turno ${turnoActual.turno} devuelto`);
+  await cargarTurnos();
+}
+
+// Al cargar la página, carga los turnos
+window.addEventListener('DOMContentLoaded', () => {
+  console.log("DOMContentLoaded - cargando turnos");
+  cargarTurnos();
+});
+
+// Exponer funciones para que el HTML pueda llamarlas en onclick
+window.abrirModal = abrirModal;
+window.cerrarModal = cerrarModal;
+window.abrirModalCobro = abrirModalCobro;
+window.cerrarModalCobro = cerrarModalCobro;
+window.devolverTurno = devolverTurno;
+window.guardarCobro = guardarCobro;
+window.tomarTurno = tomarTurno;
+
+console.log("Funciones expuestas y script cargado.");

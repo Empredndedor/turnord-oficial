@@ -17,8 +17,7 @@
         <a href="turno.html" class="block hover:text-blue-300">Turnos</a>
         <a href="negocio.html" class="block text-blue-300 font-semibold">Mi negocio</a>
         <a href="#" class="block hover:text-blue-300">Configuración</a>
-      <a href="/cierre.html" id="cerrarSesion" class="block hover:text-red-400 mt-6">Cerrar sesión</a>
-
+        <a href="/cierre.html" id="cerrarSesion" class="block hover:text-red-400 mt-6">Cerrar sesión</a>
       </nav>
     </aside>
 
@@ -30,15 +29,15 @@
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
         <div class="bg-white p-4 rounded-xl shadow">
           <h3 class="text-lg font-semibold">Turnos en espera</h3>
-          <p class="text-3xl font-bold text-blue-700 mt-2">4</p>
+          <p id="turnosEspera" class="text-3xl font-bold text-blue-700 mt-2">0</p>
         </div>
         <div class="bg-white p-4 rounded-xl shadow">
           <h3 class="text-lg font-semibold">Turnos atendidos</h3>
-          <p class="text-3xl font-bold text-green-600 mt-2">15</p>
+          <p id="turnosAtendidos" class="text-3xl font-bold text-green-600 mt-2">0</p>
         </div>
         <div class="bg-white p-4 rounded-xl shadow">
           <h3 class="text-lg font-semibold">Turnos del día</h3>
-          <p class="text-3xl font-bold text-purple-600 mt-2">19</p>
+          <p id="turnosDia" class="text-3xl font-bold text-purple-600 mt-2">0</p>
         </div>
       </div>
 
@@ -50,7 +49,7 @@
       </div>
 
       <!-- Tabla de turnos -->
-     <div class="bg-white rounded-xl shadow p-4 overflow-x-auto">
+      <div class="bg-white rounded-xl shadow p-4 overflow-x-auto">
         <h2 class="text-lg font-bold mb-4">Historial de turnos</h2>
         <table class="min-w-full text-left">
           <thead>
@@ -61,25 +60,23 @@
               <th class="py-2 px-4 border-b">Estado</th>
             </tr>
           </thead>
-          <tbody>
-            <tr>
-              <td class="py-2 px-4 border-b">A01</td>
-              <td class="py-2 px-4 border-b">Juan Pérez</td>
-              <td class="py-2 px-4 border-b">10:00 AM</td>
-              <td class="py-2 px-4 border-b text-green-600 font-semibold">Atendido</td>
-            </tr>
-            <tr>
-              <td class="py-2 px-4 border-b">A02</td>
-              <td class="py-2 px-4 border-b">Ana López</td>
-              <td class="py-2 px-4 border-b">10:30 AM</td>
-              <td class="py-2 px-4 border-b text-yellow-600 font-semibold">En espera</td>
-            </tr>
-            <!-- Más filas dinámicas -->
+          <tbody id="tablaHistorial">
+            <!-- Las filas dinámicas se insertan desde panel.js -->
           </tbody>
         </table>
       </div>
+
     </main>
   </div>
-<script src="/panel.js"></script>
+
+  <script type="module" src="./panel.js"></script>
+
+
+  <footer class="bg-blue-900 text-white text-center text-sm py-4 mt-12 rounded-t-xl">
+  © 2025 TurnoRD Todo los derechos reservado • Hecho por <strong>LUIS ALFREDO CABRERA REYES</strong>
+</footer>
+
+
+
 </body>
 </html>

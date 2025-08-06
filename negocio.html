@@ -30,19 +30,20 @@
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
           <div class="bg-green-100 p-4 rounded-lg">
             <p class="text-lg font-medium">Ganancia del Día</p>
-            <p class="text-2xl font-bold text-green-700">$1,500</p>
+            <p class="text-2xl font-bold text-green-700">$0</p>
           </div>
           <div class="bg-blue-100 p-4 rounded-lg">
             <p class="text-lg font-medium">Ganancia Semanal</p>
-            <p class="text-2xl font-bold text-blue-700">$9,500</p>
+            <p class="text-2xl font-bold text-blue-700">$0</p>
           </div>
           <div class="bg-purple-100 p-4 rounded-lg">
             <p class="text-lg font-medium">Ganancia Mensual</p>
-            <p class="text-2xl font-bold text-purple-700">$32,000</p>
+            <p class="text-2xl font-bold text-purple-700">$0</p>
           </div>
         </div>
-        <button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Exportar a Excel</button>
-        <button class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 ml-2">Exportar a PDF</button>
+        <button id="exportExcel" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Exportar a Excel</button>
+
+        <!--button class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 ml-2">Exportar a PDF</button-->
       </section>
 
       <!-- Configuración de horario y cierre automático -->
@@ -110,6 +111,13 @@
 
     </main>
   </div>
-  <script src="/negocio.js"></script>
+ <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+<script type="module" src="./negocio.js"></script>
+
+
+<footer class="bg-blue-900 text-white text-center text-sm py-4 mt-12 rounded-t-xl">
+  © 2025 TurnoRD Todo los derechos reservado • Hecho por <strong>LUIS ALFREDO CABRERA REYES</strong>
+</footer>
+
 </body>
 </html>
