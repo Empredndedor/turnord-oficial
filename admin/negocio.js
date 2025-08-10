@@ -1,4 +1,4 @@
-import { supabase } from './database.js';
+import { supabase } from '../database.js';
 
 const negocioId = 'barberia0001';
 
