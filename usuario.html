@@ -1,29 +1,29 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>TurnORD</title>
-<script src="https://cdn.tailwindcss.com"></script>
-
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TurnORD</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-200 text-white min-h-screen flex items-center justify-center px-4">
 
-<div class="text-center text-blue-900 w-full max-w-md p-6 bg-white rounded-2xl shadow-lg">
+  <div class="text-center text-blue-900 w-full max-w-md p-6 bg-white rounded-2xl shadow-lg">
     <h1 class="text-2xl tracking-wide mb-2 font-bold">TURNORD</h1>
-    <p class="text-xl font-semibold">Hola, Como Estas</p>
+    <p class="text-xl font-semibold">Hola, ¿Cómo Estás?</p>
     <p class="text-sm text-gray-500 mb-8" id="fecha-de-hoy"></p>
 
     <div class="bg-gray-100 text-blue-900 p-6 rounded-xl mb-6 shadow-inner">
-    <div class="text-4xl font-bold" id="turno-actual">A00</div>
-    <div class="text-sm mt-2 font-medium">TURNO ACTUAL</div>
-    <div class="text-lg font-semibold mt-4"><span id="conteo-turno">0</span> EN ESPERA</div>
+      <div class="text-4xl font-bold" id="turno-actual">A00</div>
+      <div class="text-sm mt-2 font-medium">TURNO ACTUAL</div>
+      <div class="text-lg font-semibold mt-4"><span id="conteo-turno">0</span> EN ESPERA</div>
     </div>
 
     <!-- Botón para abrir modal -->
     <button onclick="document.getElementById('modal').classList.remove('hidden')"
-    class="bg-blue-900 hover:bg-blue-800 transition w-full py-3 text-white font-semibold rounded-xl">
-    TOMAR TURNO
+      class="bg-blue-900 hover:bg-blue-800 transition w-full py-3 text-white font-semibold rounded-xl">
+      TOMAR TURNO
     </button>
 
     <!-- Contenedor del mensaje de confirmación -->
@@ -31,57 +31,51 @@
 
     <!-- Modal -->
     <div id="modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden px-4">
-    <div class="bg-white text-blue-900 rounded-2xl w-full max-w-2xl p-6 relative shadow-2xl">
-        <button onclick="document.getElementById('modal').classList.add('hidden')"
-        class="absolute top-4 right-4 text-blue-900 text-2xl font-bold">&times;</button>
+      <div class="bg-white text-blue-900 rounded-2xl w-full max-w-2xl p-6 relative shadow-2xl">
+        <button onclick="cerrarModal()"
+          class="absolute top-4 right-4 text-blue-900 text-2xl font-bold">&times;</button>
         <h2 class="text-xl font-bold mb-4">Tomar turno</h2>
         <form id="formRegistroNegocio" class="space-y-4">
-        <div class="grid md:grid-cols-2 gap-4">
+          <div class="grid md:grid-cols-2 gap-4">
             <div>
-            <label class="block text-sm font-medium mb-1">Nombre</label>
-            <input type="text" name="nombre" required class="w-full border border-gray-300 rounded-lg p-2" />
+              <label class="block text-sm font-medium mb-1">Nombre</label>
+              <input type="text" id="nombre" name="nombre" pattern="[A-Za-zÁÉÍÓÚáéíóúÑñ ]{2,40}" maxlength="40" required placeholder="Nombre"
+                class="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                oninvalid="this.setCustomValidity('El nombre solo debe contener letras y espacios (2 a 40 caracteres)')"
+                oninput="this.setCustomValidity('')" />
             </div>
             <div>
-            <label class="block text-sm font-medium mb-1">Teléfono</label>
-            <input type="tel" name="telefono" required class="w-full border border-gray-300 rounded-lg p-2" />
+              <label class="block text-sm font-medium mb-1">Teléfono</label>
+              <input type="tel" id="telefono" name="telefono" pattern="[0-9]{8,15}" maxlength="15" required placeholder="Teléfono"
+                class="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                oninvalid="this.setCustomValidity('Ingrese solo números, entre 8 y 15 dígitos')"
+                oninput="this.setCustomValidity('')" />
             </div>
             <div class="md:col-span-2">
-            <label class="block text-sm font-medium mb-1">Servicio</label>
-            <select name="tipo" required class="w-full border border-gray-300 rounded-lg p-2">
+              <label class="block text-sm font-medium mb-1">Servicio</label>
+              <select name="tipo" required class="w-full border border-gray-300 rounded-lg p-2">
                 <option value="">Selecciona</option>
                 <option>Barbería</option>
-                <!--option>Salón de Belleza</option-->
-                <!--option>Centro de Uñas</option-->
-                <!--option>Clínica</option-->
-                <!--option>Otro</option-->
-            </select>
+              </select>
             </div>
-            <div class="md:col-span-2">
-            <!--label class="block text-sm font-medium mb-1">Descripción / Servicios</label-->
-            <!--textarea name="descripcion" rows="3" required
-                class="w-full border border-gray-300 rounded-lg p-2"></textarea-->
-            </div>
-        </div>
-        <div class="flex justify-between items-center pt-4">
+          </div>
+          <div class="flex justify-between items-center pt-4">
             <span id="estadoRegistro" class="text-green-600 text-sm"></span>
             <button type="submit"
-            class="bg-blue-900 text-white px-4 py-2 rounded-lg hover:bg-blue-800 transition">
-            Registrar
+              class="bg-blue-900 text-white px-4 py-2 rounded-lg hover:bg-blue-800 transition">
+              Registrar
             </button>
-        </div>
+          </div>
         </form>
+      </div>
     </div>
-    </div>
-</div>
+  </div>
 
-<div id="listaEspera" class="space-y-2 mt-4"></div>
+  <!-- Lista de espera -->
+  <div id="listaEspera" class="space-y-2 mt-4"></div>
 
-
-<script type="module" src="./usuario.js"></script>
-
-
-
-
+  <!-- Archivo JS principal -->
+  <script type="module" src="./usuario.js"></script>
 
 </body>
 </html>

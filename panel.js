@@ -1,76 +1,121 @@
+// panel.js
 import { supabase } from './database.js';
 
 const negocioId = 'barberia0001';
 
-// Función principal para cargar datos
+// Función para actualizar los contadores en el DOM
+function actualizarContadores(turnosHoy) {
+  document.getElementById('turnosEspera').textContent =
+    turnosHoy.filter(t => t.estado === 'En espera').length;
+  document.getElementById('turnosAtendidos').textContent =
+    turnosHoy.filter(t => t.estado === 'Atendido').length;
+  document.getElementById('turnosDia').textContent = turnosHoy.length;
+}
+
+// Función para actualizar la tabla con los turnos del día
+function actualizarTabla(turnosHoy) {
+  const tabla = document.getElementById('tablaHistorial');
+  tabla.innerHTML =
+    turnosHoy.length === 0
+      ? `<tr><td colspan="4" class="py-4 text-center text-gray-500">No hay turnos registrados hoy.</td></tr>`
+      : '';
+
+  turnosHoy.forEach(turno => {
+    const fila = document.createElement('tr');
+    fila.innerHTML = `
+      <td class="py-2 px-4 border-b">${turno.turno}</td>
+      <td class="py-2 px-4 border-b">${turno.nombre || 'Sin nombre'}</td>
+      <td class="py-2 px-4 border-b">${turno.hora || 'Sin hora'}</td>
+      <td class="py-2 px-4 border-b">
+        <span class="${
+          turno.estado === 'En espera'
+            ? 'text-yellow-500'
+            : turno.estado === 'Atendido'
+            ? 'text-green-500'
+            : 'text-gray-500'
+        } font-bold">${turno.estado}</span>
+      </td>
+    `;
+    tabla.appendChild(fila);
+  });
+}
+
+// Función para cargar datos y actualizar vista, devuelve los turnos del día
 async function cargarDatos() {
   try {
-    const hoy = new Date().toISOString().slice(0, 10);
-
+    const hoy = new Date().toISOString().split('T')[0];
     const { data, error } = await supabase
       .from('turnos')
       .select('*')
       .eq('negocio_id', negocioId)
-      .gte('fecha', hoy)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
 
-    // Calcular contadores
-    const turnosEspera = data.filter(t => t.estado === 'En espera').length;
-    const turnosAtendidos = data.filter(t => t.estado === 'Atendido').length;
-    const turnosDia = data.length;
-
-    // Actualizar HTML
-    document.getElementById('turnosEspera').textContent = turnosEspera;
-    document.getElementById('turnosAtendidos').textContent = turnosAtendidos;
-    document.getElementById('turnosDia').textContent = turnosDia;
-
-    // Llenar tabla
-    const tabla = document.getElementById('tablaHistorial');
-    tabla.innerHTML = '';
-
-    data.forEach(turno => {
-      const fila = document.createElement('tr');
-      fila.innerHTML = `
-        <td class="py-2 px-4 border-b">${turno.turno}</td>
-        <td class="py-2 px-4 border-b">${turno.nombre || ''}</td>
-        <td class="py-2 px-4 border-b">${turno.hora || ''}</td>
-        <td class="py-2 px-4 border-b">${turno.estado}</td>
-      `;
-      tabla.appendChild(fila);
+    const turnosHoy = data.filter(t => {
+      const fechaBase = t.fecha || t.created_at;
+      if (!fechaBase) return false;
+      const fechaTurno = new Date(fechaBase).toISOString().split('T')[0];
+      return fechaTurno === hoy;
     });
 
-  } catch (error) {
-    console.error('Error al cargar datos del panel:', error.message);
+    actualizarContadores(turnosHoy);
+    actualizarTabla(turnosHoy);
+
+    return turnosHoy;
+  } catch (err) {
+    console.error('Error al cargar datos:', err);
+    alert('Error al cargar los datos del panel.');
+    return [];
   }
 }
 
-// Limpiar historial del día actual
+// Función para limpiar historial del día actual
 async function limpiarHistorialTurnos() {
-  const confirmacion = confirm('¿Estás seguro que quieres limpiar el historial del día?');
-  if (!confirmacion) return;
+  if (!confirm('¿Estás seguro que quieres limpiar el historial del día?')) return;
 
   try {
-    const hoy = new Date().toISOString().slice(0, 10);
+    const hoy = new Date().toISOString().split('T')[0];
 
-    const { error } = await supabase
+    // Obtener ids de turnos del día para borrar
+    const { data, error: fetchError } = await supabase
+      .from('turnos')
+      .select('id, fecha, created_at')
+      .eq('negocio_id', negocioId);
+
+    if (fetchError) throw fetchError;
+
+    const idsAEliminar = data
+      .filter(t => {
+        const fechaBase = t.fecha || t.created_at;
+        if (!fechaBase) return false;
+        const fechaTurno = new Date(fechaBase).toISOString().split('T')[0];
+        return fechaTurno === hoy;
+      })
+      .map(t => t.id);
+
+    if (idsAEliminar.length === 0) {
+      alert('No hay turnos para eliminar hoy.');
+      return;
+    }
+
+    // Eliminar turnos
+    const { error: deleteError } = await supabase
       .from('turnos')
       .delete()
-      .eq('negocio_id', negocioId)
-      .gte('fecha', hoy);
+      .in('id', idsAEliminar);
 
-    if (error) throw error;
+    if (deleteError) throw deleteError;
 
     alert('✅ Historial limpiado con éxito');
     cargarDatos();
-
   } catch (error) {
+    console.error('Error al limpiar historial:', error);
     alert('❌ Error al limpiar historial: ' + error.message);
   }
 }
 
-// Suscribirse en tiempo real a cambios en la tabla 'turnos'
+// Suscripción en tiempo real para actualizar datos al instante
 function suscribirseTurnos() {
   supabase
     .channel('canal-turnos')
@@ -80,21 +125,35 @@ function suscribirseTurnos() {
         event: '*',
         schema: 'public',
         table: 'turnos',
-        filter: `negocio_id=eq.${negocioId}`
+        filter: `negocio_id=eq.${negocioId}`,
       },
-      (payload) => {
-        console.log('🟢 Cambio en turnos:', payload);
-        cargarDatos(); // actualizar el panel automáticamente
+      async payload => {
+        console.log('🟢 Actualización en tiempo real:', payload);
+        await cargarDatos();
       }
     )
     .subscribe();
 }
 
-// Iniciar cuando la página carga
+// Función para resaltar menú activo en sidebar
+function resaltarMenu() {
+  const path = window.location.pathname.split('/').pop();
+  document.querySelectorAll('aside nav a').forEach(link => {
+    const href = link.getAttribute('href');
+    if (href === path) {
+      link.classList.add('bg-white', 'text-blue-900', 'font-semibold', 'shadow');
+    } else {
+      link.classList.remove('bg-white', 'text-blue-900', 'font-semibold', 'shadow');
+    }
+  });
+}
+
+// Inicialización al cargar la página
 window.addEventListener('DOMContentLoaded', () => {
+  resaltarMenu();
   cargarDatos();
-  suscribirseTurnos(); // habilita actualizaciones en tiempo real
+  suscribirseTurnos();
 });
 
-// Exponer función de limpieza para el botón
+// Exponer limpiar historial al global para el botón
 window.limpiarHistorialTurnos = limpiarHistorialTurnos;

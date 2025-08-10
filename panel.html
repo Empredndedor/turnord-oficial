@@ -13,11 +13,11 @@
     <aside class="w-64 bg-blue-900 text-white p-6 hidden md:block">
       <h2 class="text-2xl font-bold mb-8">TurnoRD Admin</h2>
       <nav class="space-y-4">
-        <a href="panel.html" class="block hover:text-blue-300">Inicio</a>
-        <a href="turno.html" class="block hover:text-blue-300">Turnos</a>
-        <a href="negocio.html" class="block text-blue-300 font-semibold">Mi negocio</a>
-        <a href="#" class="block hover:text-blue-300">Configuración</a>
-        <a href="/cierre.html" id="cerrarSesion" class="block hover:text-red-400 mt-6">Cerrar sesión</a>
+        <a href="panel.html" class="block hover:text-blue-300 rounded px-3 py-2">Inicio</a>
+        <a href="turno.html" class="block bg-white text-blue-900 font-semibold rounded px-3 py-2 shadow">Turnos</a>
+        <a href="negocio.html" class="block hover:text-blue-300 rounded px-3 py-2">Mi negocio</a>
+        <a href="#" class="block hover:text-blue-300 rounded px-3 py-2">Configuración</a>
+        <a href="/cierre.html" id="cerrarSesion" class="block hover:text-red-400 mt-6 rounded px-3 py-2">Cerrar sesión</a>
       </nav>
     </aside>
 
@@ -66,17 +66,61 @@
         </table>
       </div>
 
+      <!-- Input teléfono -->
+      <!--div class="mt-6">
+        <input type="tel" id="telefono" name="telefono" pattern="[0-9]{8,15}" maxlength="15" required placeholder="Teléfono"
+  class="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+  oninvalid="this.setCustomValidity('Ingrese solo números, entre 8 y 15 dígitos')"
+  oninput="this.setCustomValidity('')" />
+      </div-->
+
+      <!-- Input nombre -->
+      <!--div class="mt-6">
+        <input type="text" id="nombre" name="nombre" pattern="[A-Za-zÁÉÍÓÚáéíóúÑñ ]{2,40}" maxlength="40" required placeholder="Nombre"
+  class="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+  oninvalid="this.setCustomValidity('El nombre solo debe contener letras y espacios (2 a 40 caracteres)')"
+  oninput="this.setCustomValidity('')" />
+      </div-->
+
     </main>
   </div>
 
   <script type="module" src="./panel.js"></script>
+  <script>
+    const nombre = document.getElementById('nombre').value.trim();
+    const telefono = document.getElementById('telefono').value.trim();
 
+    if (!nombre || !/^[A-Za-zÁÉÍÓÚáéíóúÑñ ]{2,40}$/.test(nombre)) {
+      alert('El nombre solo debe contener letras y espacios (2 a 40 caracteres).');
+      return;
+    }
+    if (!/^\d{8,15}$/.test(telefono)) {
+      alert('El teléfono debe contener solo números (8 a 15 dígitos).');
+      return;
+    }
+  </script>
+  <script>
+document.getElementById('telefono').addEventListener('input', function() {
+  this.value = this.value.replace(/[^0-9]/g, '');
+});
+document.getElementById('nombre').addEventListener('input', function() {
+  this.value = this.value.replace(/[^A-Za-zÁÉÍÓÚáéíóúÑñ ]/g, '');
+});
+</script>
+<script>
+  // Esto busca todos los enlaces del sidebar y resalta el que coincide con la URL
+  document.querySelectorAll('aside nav a').forEach(link => {
+    if (window.location.pathname.endsWith(link.getAttribute('href'))) {
+      link.classList.add('bg-white', 'text-blue-900', 'font-semibold', 'shadow');
+    } else {
+      link.classList.remove('bg-white', 'text-blue-900', 'font-semibold', 'shadow');
+    }
+  });
+</script>
 
   <footer class="bg-blue-900 text-white text-center text-sm py-4 mt-12 rounded-t-xl">
   © 2025 TurnoRD Todo los derechos reservado • Hecho por <strong>LUIS ALFREDO CABRERA REYES</strong>
 </footer>
-
-
 
 </body>
 </html>

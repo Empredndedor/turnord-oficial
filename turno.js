@@ -3,21 +3,39 @@ import { supabase } from './database.js';
 const negocioId = 'barberia0001';
 let turnoActual = null;
 
+let HORA_LIMITE_TURNOS = "23:00"; // valor por defecto
+
 // Tomar turno manual desde el modal
 async function tomarTurno(event) {
   event.preventDefault();
   console.log("tomarTurno llamada");
 
+  // Validar hora límite
+  const ahora = new Date();
+  const horaActual = ahora.toTimeString().slice(0,5);
+  const horaStr = ahora.toLocaleTimeString('es-ES', { hour12: false });  // formato 24h "HH:mm:ss"
+  if (horaActual >= HORA_LIMITE_TURNOS) {
+    alert('Ya no se pueden tomar turnos a esta hora. Intenta mañana.');
+    return;
+  }
+
   const nombre = document.getElementById('nombre').value.trim();
   const telefono = document.getElementById('telefono').value.trim();
+
+  if (!nombre || !/^[A-Za-zÁÉÍÓÚáéíóúÑñ ]{2,40}$/.test(nombre)) {
+    alert('El nombre solo debe contener letras y espacios (2 a 40 caracteres).');
+    return;
+  }
+  if (!/^\d{8,15}$/.test(telefono)) {
+    alert('El teléfono debe contener solo números (8 a 15 dígitos).');
+    return;
+  }
+
   const servicio = document.getElementById('servicio').value;
 
   const turnoGenerado = await generarNuevoTurno();
 
-  const ahora = new Date();
-const horaStr = ahora.toLocaleTimeString('es-ES', { hour12: false });  // formato 24h "HH:mm:ss"
-
-
+  const hoy = new Date().toISOString().slice(0, 10);
   const { error } = await supabase.from('turnos').insert([{
   negocio_id: negocioId,
   turno: turnoGenerado,
@@ -25,9 +43,9 @@ const horaStr = ahora.toLocaleTimeString('es-ES', { hour12: false });  // format
   telefono: telefono,
   servicio: servicio,
   estado: 'En espera',
-  hora: horaStr    // enviamos la hora
+  hora: horaStr,
+  fecha: hoy // <--- agrega la fecha aquí
 }]);
-
 
   if (error) {
     alert('Error al guardar turno: ' + error.message);
@@ -42,11 +60,13 @@ const horaStr = ahora.toLocaleTimeString('es-ES', { hour12: false });  // format
 
 // Generar el próximo turno disponible
 async function generarNuevoTurno() {
+  const hoy = new Date().toISOString().slice(0, 10);
+
   const { data, error } = await supabase
     .from('turnos')
-    .select('turno')
+    .select('turno, fecha')
     .eq('negocio_id', negocioId)
-    .order('created_at', { ascending: false })  // Orden descendente para obtener último registro
+    .order('created_at', { ascending: false })
     .limit(1);
 
   if (error) {
@@ -54,8 +74,12 @@ async function generarNuevoTurno() {
     return 'A01';
   }
 
-  if (!data || data.length === 0) return 'A01';
+  // Si no hay turnos, o el último turno es de otro día, reinicia a A01
+  if (!data || data.length === 0 || !data[0].fecha || data[0].fecha !== hoy) {
+    return 'A01';
+  }
 
+  // Si es el mismo día, incrementa el número
   const ultimo = data[0].turno;
   const letra = ultimo.charAt(0);
   const numero = parseInt(ultimo.substring(1)) + 1;
@@ -86,7 +110,7 @@ async function cargarTurnos() {
   data.forEach(t => {
     const div = document.createElement('div');
     div.className = 'bg-blue-100 text-blue-900 p-3 rounded-lg shadow';
-    div.innerHTML = `<strong>${t.turno}</strong><br>${t.cliente || ''}`;
+    div.innerHTML = `<strong>${t.turno}</strong><br>${t.nombre || ''}`;
     lista.appendChild(div);
   });
 
@@ -146,7 +170,7 @@ async function guardarCobro(event) {
   }
 
   cerrarModalCobro();
-  alert(`✅ Turno ${turnoActual.turno} finalizado con cobro de RD$${monto}`);
+  alert(`✅ Turno ${turnoActual.turno} finalizado with cobro de RD$${monto}`);
   await cargarTurnos();
 }
 
@@ -175,8 +199,9 @@ async function devolverTurno() {
 }
 
 // Al cargar la página, carga los turnos
-window.addEventListener('DOMContentLoaded', () => {
+window.addEventListener('DOMContentLoaded', async () => {
   console.log("DOMContentLoaded - cargando turnos");
+  await cargarHoraCierre();
   cargarTurnos();
 });
 
@@ -190,3 +215,15 @@ window.guardarCobro = guardarCobro;
 window.tomarTurno = tomarTurno;
 
 console.log("Funciones expuestas y script cargado.");
+
+async function cargarHoraCierre() {
+  const { data, error } = await supabase
+    .from('configuracion_negocio')
+    .select('hora_cierre')
+    .eq('negocio_id', negocioId)
+    .single();
+
+  if (!error && data && data.hora_cierre) {
+    HORA_LIMITE_TURNOS = data.hora_cierre;
+  }
+}

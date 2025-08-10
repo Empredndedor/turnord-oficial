@@ -12,12 +12,11 @@
     <aside class="w-64 bg-blue-900 text-white p-6 hidden md:block">
       <h2 class="text-2xl font-bold mb-8">TurnoRD Admin</h2>
       <nav class="space-y-4">
-       <a href="panel.html" class="block hover:text-blue-300">Inicio</a>
-       <a href="turno.html" class="block hover:text-blue-300">Turnos</a>
-       <a href="negocio.html" class="block text-blue-300 font-semibold">Mi negocio</a>
-        <a href="#" class="block hover:text-blue-300">Configuración</a>
-        <a href="/cierre.html" id="cerrarSesion" class="block hover:text-red-400 mt-6">Cerrar sesión</a>
-
+        <a href="panel.html" class="block hover:text-blue-300 rounded px-3 py-2">Inicio</a>
+        <a href="turno.html" class="block bg-white text-blue-900 font-semibold rounded px-3 py-2 shadow">Turnos</a>
+        <a href="negocio.html" class="block hover:text-blue-300 rounded px-3 py-2">Mi negocio</a>
+        <a href="#" class="block hover:text-blue-300 rounded px-3 py-2">Configuración</a>
+        <a href="/cierre.html" id="cerrarSesion" class="block hover:text-red-400 mt-6 rounded px-3 py-2">Cerrar sesión</a>
       </nav>
     </aside>
 
@@ -30,15 +29,15 @@
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
           <div class="bg-green-100 p-4 rounded-lg">
             <p class="text-lg font-medium">Ganancia del Día</p>
-            <p class="text-2xl font-bold text-green-700">$0</p>
+            <p class="text-2xl font-bold text-green-700">$<span id="ganancia-dia">0</span></p>
           </div>
           <div class="bg-blue-100 p-4 rounded-lg">
             <p class="text-lg font-medium">Ganancia Semanal</p>
-            <p class="text-2xl font-bold text-blue-700">$0</p>
+            <p class="text-2xl font-bold text-blue-700">$<span id="ganancia-semana">0</span></p>
           </div>
           <div class="bg-purple-100 p-4 rounded-lg">
             <p class="text-lg font-medium">Ganancia Mensual</p>
-            <p class="text-2xl font-bold text-purple-700">$0</p>
+            <p class="text-2xl font-bold text-purple-700">$<span id="ganancia-mes">0</span></p>
           </div>
         </div>
         <button id="exportExcel" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Exportar a Excel</button>
@@ -56,7 +55,7 @@
           </div>
           <div>
             <label class="block font-medium mb-1">Hora de cierre:</label>
-            <input type="time" class="w-full border px-3 py-2 rounded" value="20:00" />
+            <input type="time" id="hora-cierre" class="w-full border px-3 py-2 rounded" value="20:00" />
           </div>
           <div>
             <label class="block font-medium mb-1">Límite de turnos por día:</label>
@@ -113,7 +112,16 @@
   </div>
  <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
 <script type="module" src="./negocio.js"></script>
-
+<script>
+  // Esto busca todos los enlaces del sidebar y resalta el que coincide con la URL
+  document.querySelectorAll('aside nav a').forEach(link => {
+    if (window.location.pathname.endsWith(link.getAttribute('href'))) {
+      link.classList.add('bg-white', 'text-blue-900', 'font-semibold', 'shadow');
+    } else {
+      link.classList.remove('bg-white', 'text-blue-900', 'font-semibold', 'shadow');
+    }
+  });
+</script>
 
 <footer class="bg-blue-900 text-white text-center text-sm py-4 mt-12 rounded-t-xl">
   © 2025 TurnoRD Todo los derechos reservado • Hecho por <strong>LUIS ALFREDO CABRERA REYES</strong>
