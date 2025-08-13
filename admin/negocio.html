@@ -47,25 +47,28 @@
 
       <!-- Configuración de horario y cierre automático -->
       <section class="bg-white p-6 rounded-xl shadow">
-        <h2 class="text-2xl font-bold mb-4">🕒 Configuración de Horario</h2>
-        <form class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label class="block font-medium mb-1">Hora de apertura:</label>
-            <input type="time" class="w-full border px-3 py-2 rounded" value="08:00" />
-          </div>
-          <div>
-            <label class="block font-medium mb-1">Hora de cierre:</label>
-            <input type="time" id="hora-cierre" class="w-full border px-3 py-2 rounded" value="20:00" />
-          </div>
-          <div>
-            <label class="block font-medium mb-1">Límite de turnos por día:</label>
-            <input type="number" class="w-full border px-3 py-2 rounded" value="30" />
-          </div>
-          <div class="flex items-end">
-            <button class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Guardar configuración</button>
-          </div>
-        </form>
-      </section>
+  <h2 class="text-2xl font-bold mb-4">🕒 Configuración de Horario</h2>
+  <form class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div>
+      <label class="block font-medium mb-1">Hora de apertura:</label>
+      <input type="time" id="hora-apertura" class="w-full border px-3 py-2 rounded" value="08:00" />
+    </div>
+    <div>
+      <label class="block font-medium mb-1">Hora de cierre:</label>
+      <input type="time" id="hora-cierre" class="w-full border px-3 py-2 rounded" value="20:00" />
+    </div>
+    <div>
+      <label class="block font-medium mb-1">Límite de turnos por día:</label>
+      <input type="number" id="limite-turnos" class="w-full border px-3 py-2 rounded" value="30" min="1" />
+    </div>
+
+    <div class="md:col-span-2">
+      <button id="btnGuardarConfig" class="bg-blue-500 text-white px-4 py-2 rounded">
+        Guardar configuración
+      </button>
+    </div>
+  </form>
+</section>
 
       <!-- Control de sucursales -->
       <section class="bg-white p-6 rounded-xl shadow">

@@ -126,3 +126,133 @@ window.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('hora-cierre').value = data.hora_cierre;
   }
 });
+
+
+
+// Función para obtener hora de cierre
+async function obtenerConfiguracion() {
+  const { data, error } = await supabase
+    .from('configuracion_negocio')
+    .select('hora_cierre')
+    .eq('negocio_id', negocioId)
+    .single();
+
+  if (error) {
+    console.error('Error obteniendo configuración:', error.message);
+    return null;
+  }
+
+  return data?.hora_cierre || null;
+}
+
+
+// Función para obtener hora desde Supabase
+async function obtenerConfiguracion() {
+  const { data, error } = await supabase
+    .from('configuracion_negocio')
+    .select('hora_cierre')
+    .eq('negocio_id', negocioId)
+    .single();
+
+  if (error) {
+    console.error('Error obteniendo configuración:', error.message);
+    return null;
+  }
+  return data?.hora_cierre || null;
+}
+
+// Cargar valor en el input al iniciar
+async function cargarHoraCierre() {
+  const horaCierre = await obtenerConfiguracion();
+  const input = document.getElementById('hora-cierre');
+
+  if (horaCierre && input) {
+    input.value = horaCierre; // asigna el valor de la BD
+  }
+}
+
+cargarHoraCierre();
+
+async function actualizarHoraCierre(nuevaHora) {
+  const { error } = await supabase
+    .from('configuracion_negocio')
+    .update({ hora_cierre: nuevaHora })
+    .eq('negocio_id', negocioId);
+
+  if (error) {
+    console.error('Error actualizando hora:', error.message);
+    alert('Error al actualizar la hora');
+  } else {
+    alert('Hora de cierre actualizada correctamente');
+  }
+}
+
+// Si tienes un botón para guardar
+document.getElementById('btnGuardarHora').addEventListener('click', () => {
+  const nuevaHora = document.getElementById('hora-cierre').value;
+  if (nuevaHora) {
+    actualizarHoraCierre(nuevaHora);
+  } else {
+    alert('Debe seleccionar una hora');
+  }
+});
+
+
+
+//horario configuracion
+
+async function tomarTurno(clienteId, fecha, hora) {
+  // 1. Obtener configuración
+  const { data: config, error: configError } = await supabase
+    .from('configuracion_negocio')
+    .select('hora_apertura, hora_cierre, limite_turnos')
+    .eq('negocio_id', negocioId)
+    .single();
+
+  if (configError || !config) {
+    alert('❌ No se pudo obtener la configuración del negocio.');
+    return;
+  }
+
+  const { hora_apertura, hora_cierre, limite_turnos } = config;
+
+  // 2. Validar horario
+  if (hora < hora_apertura || hora > hora_cierre) {
+    alert(`⛔ El negocio solo atiende de ${hora_apertura} a ${hora_cierre}.`);
+    return;
+  }
+
+  // 3. Validar límite de turnos en el día
+  const { count, error: countError } = await supabase
+    .from('turnos')
+    .select('id', { count: 'exact', head: true })
+    .eq('negocio_id', negocioId)
+    .eq('fecha', fecha);
+
+  if (countError) {
+    alert('❌ Error al verificar turnos del día.');
+    return;
+  }
+
+  if (count >= limite_turnos) {
+    alert(`⛔ Se alcanzó el límite de ${limite_turnos} turnos para hoy.`);
+    return;
+  }
+
+  // 4. Insertar turno si pasa las validaciones
+  const { error: insertError } = await supabase.from('turnos').insert([
+    {
+      negocio_id: negocioId,
+      cliente_id: clienteId,
+      fecha: fecha,
+      hora: hora,
+      estado: 'pendiente'
+    }
+  ]);
+
+  if (insertError) {
+    alert('❌ Error al registrar el turno.');
+  } else {
+    alert('✅ Turno registrado con éxito.');
+  }
+}

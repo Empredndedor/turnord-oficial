@@ -9,6 +9,41 @@ let telefonoUsuario = localStorage.getItem('telefonoUsuario') || null;
 
 let HORA_LIMITE_TURNOS = "23:00"; // valor por defecto
 
+async function tomarTurno(nombre, telefono, servicio) {
+  const horaCierre = await obtenerConfiguracion();
+  const ahora = new Date();
+  const [cierreHora, cierreMin] = horaCierre.split(':').map(Number);
+
+  if (
+    ahora.getHours() > cierreHora ||
+    (ahora.getHours() === cierreHora && ahora.getMinutes() > cierreMin)
+  ) {
+    alert('Ya hemos cerrado, no se pueden tomar más turnos.');
+    return;
+  }
+
+  const { error } = await supabase.from('turnos').insert([
+    {
+      negocio_id: negocioId,
+      nombre,
+      telefono,
+      servicio,
+      estado: 'pendiente',
+      fecha: new Date().toISOString().split('T')[0],
+      hora: ahora.toLocaleTimeString(),
+    },
+  ]);
+
+  if (error) {
+    console.error('Error tomando turno:', error.message);
+    alert('Error al tomar el turno');
+  } else {
+    alert('Turno registrado correctamente');
+  }
+}
+
+
+
 // === Funciones auxiliares ===
 function obtenerFechaActual() {
   const hoy = new Date();
@@ -318,3 +353,92 @@ window.addEventListener('DOMContentLoaded', async () => {
     )
     .subscribe();
 });
+
+
+
+
+// usuario.js
+
+
+// Ayuda: compara "HH:MM" (24h)
+function hhmmToMinutes(hhmm) {
+  const [h, m] = hhmm.split(':').map(Number);
+  return h * 60 + m;
+}
+
+// Obtiene config (apertura, cierre, límite)
+async function obtenerConfig() {
+  const { data, error } = await supabase
+    .from('configuracion_negocio')
+    .select('hora_apertura, hora_cierre, limite_turnos')
+    .eq('negocio_id', negocioId)
+    .single();
+
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+// Cuenta turnos de una fecha YYYY-MM-DD
+async function contarTurnosDia(fechaISO) {
+  const { count, error } = await supabase
+    .from('turnos')
+    .select('id', { count: 'exact', head: true })
+    .eq('negocio_id', negocioId)
+    .eq('fecha', fechaISO);
+
+  if (error) throw new Error(error.message);
+  return count || 0;
+}
+
+/**
+ * Llama a esta función cuando el usuario intente reservar.
+ * - nombre, telefono, servicio: strings
+ * - fechaISO: "YYYY-MM-DD" (ej. 2025-08-12)
+ * - horaHHMM: "HH:MM" 24h (ej. "14:30")
+ */
+export async function tomarTurno(nombre, telefono, servicio, fechaISO, horaHHMM) {
+  try {
+    const cfg = await obtenerConfig();
+    const aperturaMin = hhmmToMinutes(cfg.hora_apertura);
+    const cierreMin   = hhmmToMinutes(cfg.hora_cierre);
+    const horaMin     = hhmmToMinutes(horaHHMM);
+
+    // Validar hora dentro del horario [apertura, cierre]
+    if (horaMin < aperturaMin || horaMin > cierreMin) {
+      alert(`⛔ El negocio solo atiende de ${cfg.hora_apertura} a ${cfg.hora_cierre}.`);
+      return;
+    }
+
+    // Límite diario
+    const usados = await contarTurnosDia(fechaISO);
+    if (usados >= cfg.limite_turnos) {
+      alert(`⛔ Se alcanzó el límite de ${cfg.limite_turnos} turnos para ${fechaISO}.`);
+      return;
+    }
+
+    // Inserta turno
+    const ahora = new Date();
+    const { error: insertError } = await supabase.from('turnos').insert([{
+      negocio_id: negocioId,
+      nombre,
+      telefono,
+      servicio,
+      estado: 'pendiente',
+      fecha: fechaISO,
+      hora: horaHHMM,
+      created_at: ahora.toISOString()
+    }]);
+
+    if (insertError) {
+      console.error(insertError);
+      alert('❌ Error al registrar el turno.');
+    } else {
+      alert('✅ Turno registrado con éxito.');
+      // aquí puedes refrescar listas, etc.
+    }
+
+  } catch (e) {
+    console.error(e);
+    alert('❌ No se pudo validar la configuración del negocio.');
+  }
+}
