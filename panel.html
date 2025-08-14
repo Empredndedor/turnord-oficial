@@ -5,12 +5,39 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Panel Administrativo - TurnoRD</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    // Inicializar modo oscuro
+    function inicializarModoOscuro() {
+      const modoOscuro = localStorage.getItem('modoOscuro') === 'true';
+      document.documentElement.classList.toggle('dark', modoOscuro);
+    }
+    
+    // Ejecutar al cargar
+    inicializarModoOscuro();
+  </script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {}
+      }
+    }
+  </script>
 </head>
-<body class="bg-gray-100 text-gray-800">
+<body class="bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200">
+  <!-- Botón modo oscuro -->
+  <button id="toggleDarkMode" class="fixed top-4 right-4 z-50 p-2 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200">
+    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 hidden dark:block" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+    </svg>
+    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 block dark:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+    </svg>
+  </button>
 
   <!-- Sidebar -->
   <div class="flex min-h-screen">
-    <aside class="w-64 bg-blue-900 text-white p-6 hidden md:block">
+    <aside class="w-64 bg-blue-900 dark:bg-blue-950 text-white p-6 hidden md:block">
       <h2 class="text-2xl font-bold mb-8">TurnoRD Admin</h2>
       <nav class="space-y-4">
         <a href="panel.html" class="block hover:text-blue-300 rounded px-3 py-2">Inicio</a>
@@ -27,40 +54,40 @@
 
       <!-- Resumen -->
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-        <div class="bg-white p-4 rounded-xl shadow">
-          <h3 class="text-lg font-semibold">Turnos en espera</h3>
-          <p id="turnosEspera" class="text-3xl font-bold text-blue-700 mt-2">0</p>
+        <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow">
+          <h3 class="text-lg font-semibold dark:text-gray-200">Turnos en espera</h3>
+          <p id="turnosEspera" class="text-3xl font-bold text-blue-700 dark:text-blue-400 mt-2">0</p>
         </div>
-        <div class="bg-white p-4 rounded-xl shadow">
-          <h3 class="text-lg font-semibold">Turnos atendidos</h3>
-          <p id="turnosAtendidos" class="text-3xl font-bold text-green-600 mt-2">0</p>
+        <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow">
+          <h3 class="text-lg font-semibold dark:text-gray-200">Turnos atendidos</h3>
+          <p id="turnosAtendidos" class="text-3xl font-bold text-green-600 dark:text-green-400 mt-2">0</p>
         </div>
-        <div class="bg-white p-4 rounded-xl shadow">
-          <h3 class="text-lg font-semibold">Turnos del día</h3>
-          <p id="turnosDia" class="text-3xl font-bold text-purple-600 mt-2">0</p>
+        <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow">
+          <h3 class="text-lg font-semibold dark:text-gray-200">Turnos del día</h3>
+          <p id="turnosDia" class="text-3xl font-bold text-purple-600 dark:text-purple-400 mt-2">0</p>
         </div>
       </div>
 
       <!-- Botón limpiar historial -->
       <div class="flex justify-end mb-4">
-        <button onclick="limpiarHistorialTurnos()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded">
+        <button onclick="limpiarHistorialTurnos()" class="bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800 text-white px-4 py-2 rounded">
           Limpiar historial
         </button>
       </div>
 
       <!-- Tabla de turnos -->
-      <div class="bg-white rounded-xl shadow p-4 overflow-x-auto">
-        <h2 class="text-lg font-bold mb-4">Historial de turnos</h2>
+      <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4 overflow-x-auto">
+        <h2 class="text-lg font-bold mb-4 dark:text-gray-200">Historial de turnos</h2>
         <table class="min-w-full text-left">
           <thead>
             <tr>
-              <th class="py-2 px-4 border-b">Turno</th>
-              <th class="py-2 px-4 border-b">Cliente</th>
-              <th class="py-2 px-4 border-b">Hora</th>
-              <th class="py-2 px-4 border-b">Estado</th>
+              <th class="py-2 px-4 border-b dark:border-gray-700 dark:text-gray-300">Turno</th>
+              <th class="py-2 px-4 border-b dark:border-gray-700 dark:text-gray-300">Cliente</th>
+              <th class="py-2 px-4 border-b dark:border-gray-700 dark:text-gray-300">Hora</th>
+              <th class="py-2 px-4 border-b dark:border-gray-700 dark:text-gray-300">Estado</th>
             </tr>
           </thead>
-          <tbody id="tablaHistorial">
+          <tbody id="tablaHistorial" class="dark:text-gray-300">
             <!-- Las filas dinámicas se insertan desde panel.js -->
           </tbody>
         </table>
@@ -85,28 +112,9 @@
     </main>
   </div>
 
-  <script type="module" src="./panel.js"></script>
-  <script>
-    const nombre = document.getElementById('nombre').value.trim();
-    const telefono = document.getElementById('telefono').value.trim();
-
-    if (!nombre || !/^[A-Za-zÁÉÍÓÚáéíóúÑñ ]{2,40}$/.test(nombre)) {
-      alert('El nombre solo debe contener letras y espacios (2 a 40 caracteres).');
-      return;
-    }
-    if (!/^\d{8,15}$/.test(telefono)) {
-      alert('El teléfono debe contener solo números (8 a 15 dígitos).');
-      return;
-    }
-  </script>
-  <script>
-document.getElementById('telefono').addEventListener('input', function() {
-  this.value = this.value.replace(/[^0-9]/g, '');
-});
-document.getElementById('nombre').addEventListener('input', function() {
-  this.value = this.value.replace(/[^A-Za-zÁÉÍÓÚáéíóúÑñ ]/g, '');
-});
-</script>
+  <script type="module" src="admin/panel.js"></script>
+  <!-- Script de validación eliminado ya que los campos están comentados -->
+  <!-- Script de validación de entrada eliminado ya que los campos están comentados -->
 <script>
   // Esto busca todos los enlaces del sidebar y resalta el que coincide con la URL
   document.querySelectorAll('aside nav a').forEach(link => {
@@ -118,9 +126,18 @@ document.getElementById('nombre').addEventListener('input', function() {
   });
 </script>
 
-  <footer class="bg-blue-900 text-white text-center text-sm py-4 mt-12 rounded-t-xl">
+  <footer class="bg-blue-900 dark:bg-blue-950 text-white text-center text-sm py-4 mt-12 rounded-t-xl">
   © 2025 TurnoRD Todo los derechos reservado • Hecho por <strong>LUIS ALFREDO CABRERA REYES</strong>
 </footer>
+
+<script>
+  // Función para alternar modo oscuro
+  document.getElementById('toggleDarkMode').addEventListener('click', function() {
+    const modoOscuro = !document.documentElement.classList.contains('dark');
+    document.documentElement.classList.toggle('dark', modoOscuro);
+    localStorage.setItem('modoOscuro', modoOscuro);
+  });
+</script>
 
 </body>
 </html>

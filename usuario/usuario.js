@@ -10,6 +10,13 @@ let telefonoUsuario = localStorage.getItem('telefonoUsuario') || null;
 let HORA_LIMITE_TURNOS = "23:00"; // valor por defecto
 
 async function tomarTurno(nombre, telefono, servicio) {
+  // Verificar si el negocio está en break
+  const estadoBreak = await verificarBreakNegocio();
+  if (estadoBreak.enBreak) {
+    mostrarNotificacionBreak(estadoBreak.mensaje, estadoBreak.tiempoRestante);
+    return;
+  }
+
   const horaCierre = await obtenerConfiguracion();
   const ahora = new Date();
   const [cierreHora, cierreMin] = horaCierre.split(':').map(Number);
@@ -396,8 +403,82 @@ async function contarTurnosDia(fechaISO) {
  * - fechaISO: "YYYY-MM-DD" (ej. 2025-08-12)
  * - horaHHMM: "HH:MM" 24h (ej. "14:30")
  */
+// ===== FUNCIONES DE VERIFICACIÓN DE BREAK =====
+
+// Verificar si el negocio está en break
+async function verificarBreakNegocio() {
+  try {
+    const { data, error } = await supabase
+      .from('estado_negocio')
+      .select('en_break, break_end_time, break_message')
+      .eq('negocio_id', negocioId)
+      .single();
+
+    if (error && error.code !== 'PGRST116') {
+      return { enBreak: false, mensaje: null };
+    }
+
+    if (data && data.en_break) {
+      const endTime = new Date(data.break_end_time);
+      const now = new Date();
+      
+      if (endTime > now) {
+        return { 
+          enBreak: true, 
+          mensaje: data.break_message || 'Estamos en break, regresamos pronto...',
+          tiempoRestante: Math.ceil((endTime - now) / (1000 * 60)) // en minutos
+        };
+      }
+    }
+    
+    return { enBreak: false, mensaje: null };
+  } catch (error) {
+    console.error('Error al verificar break:', error);
+    return { enBreak: false, mensaje: null };
+  }
+}
+
+// Mostrar notificación de break
+function mostrarNotificacionBreak(mensaje, tiempoRestante) {
+  const notificacion = document.createElement('div');
+  notificacion.className = 'fixed top-4 right-4 bg-orange-500 text-white p-4 rounded-lg shadow-lg z-50 max-w-sm';
+  notificacion.innerHTML = `
+    <div class="flex items-start space-x-3">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+      <div>
+        <h4 class="font-semibold mb-1">Negocio en Break</h4>
+        <p class="text-sm mb-2">${mensaje}</p>
+        <p class="text-xs opacity-90">Tiempo estimado: ${tiempoRestante} minutos</p>
+      </div>
+      <button onclick="this.parentElement.parentElement.remove()" class="text-white hover:text-gray-200 ml-2">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+  `;
+  
+  document.body.appendChild(notificacion);
+  
+  // Auto-remover después de 8 segundos
+  setTimeout(() => {
+    if (notificacion.parentElement) {
+      notificacion.remove();
+    }
+  }, 8000);
+}
+
 export async function tomarTurno(nombre, telefono, servicio, fechaISO, horaHHMM) {
   try {
+    // Verificar si el negocio está en break
+    const estadoBreak = await verificarBreakNegocio();
+    if (estadoBreak.enBreak) {
+      mostrarNotificacionBreak(estadoBreak.mensaje, estadoBreak.tiempoRestante);
+      return;
+    }
+
     const cfg = await obtenerConfig();
     const aperturaMin = hhmmToMinutes(cfg.hora_apertura);
     const cierreMin   = hhmmToMinutes(cfg.hora_cierre);

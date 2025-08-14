@@ -2,257 +2,604 @@ import { supabase } from '../database.js';
 
 const negocioId = 'barberia0001';
 
+// Variables para el control de break
+let breakActivo = false;
+let breakEndTime = null;
+let breakInterval = null;
+
+// Inicialización cuando el DOM está cargado
+document.addEventListener('DOMContentLoaded', () => {
+  initThemeToggle();
+  actualizarFechaHora();
+  setInterval(actualizarFechaHora, 60000); // Actualizar cada minuto
+  setupMobileMenu();
+  initDayButtons();
+  mostrarTotales();
+  cargarConfiguracion();
+  inicializarGrafico();
+  initBreakControl();
+  verificarEstadoBreak();
+});
+
+// Función para inicializar el toggle de tema oscuro/claro
+function initThemeToggle() {
+  const themeToggle = document.getElementById('theme-toggle');
+  const htmlElement = document.documentElement;
+  
+  // Verificar si hay una preferencia guardada
+  const savedTheme = localStorage.getItem('theme');
+  if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+    htmlElement.classList.add('dark');
+  } else {
+    htmlElement.classList.remove('dark');
+  }
+  
+  themeToggle.addEventListener('click', () => {
+    htmlElement.classList.toggle('dark');
+    const isDark = htmlElement.classList.contains('dark');
+    localStorage.setItem('theme', isDark ? 'dark' : 'light');
+  });
+}
+
+// Función para actualizar la fecha y hora actual
+function actualizarFechaHora() {
+  const ahora = new Date();
+  const opciones = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+  const fechaFormateada = ahora.toLocaleDateString('es-ES', opciones);
+  const horaFormateada = ahora.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+  
+  document.getElementById('fecha-actual').textContent = fechaFormateada.charAt(0).toUpperCase() + fechaFormateada.slice(1);
+  document.getElementById('hora-actual').textContent = horaFormateada;
+}
+
+// Configuración del menú móvil
+function setupMobileMenu() {
+  const mobileMenuButton = document.getElementById('mobile-menu-button');
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sidebar-overlay');
+  
+  if (mobileMenuButton && sidebar && overlay) {
+    mobileMenuButton.addEventListener('click', toggleMobileMenu);
+    overlay.addEventListener('click', toggleMobileMenu);
+  }
+}
+
+function toggleMobileMenu() {
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sidebar-overlay');
+  
+  sidebar.classList.toggle('-translate-x-full');
+  
+  if (sidebar.classList.contains('-translate-x-full')) {
+    overlay.classList.add('opacity-0', 'pointer-events-none');
+  } else {
+    overlay.classList.remove('opacity-0', 'pointer-events-none');
+  }
+}
+
+// Inicializar botones de días de operación
+function initDayButtons() {
+  const dayButtons = document.querySelectorAll('.day-btn');
+  
+  dayButtons.forEach(button => {
+    button.addEventListener('click', () => {
+      // Si es domingo (data-day="0"), no permitir selección
+      if (button.getAttribute('data-day') === '0') return;
+      
+      button.classList.toggle('bg-blue-500');
+      button.classList.toggle('text-white');
+      
+      if (button.classList.contains('bg-blue-500')) {
+        button.classList.remove('bg-blue-100', 'dark:bg-blue-900', 'text-blue-800', 'dark:text-blue-200');
+      } else {
+        button.classList.add('bg-blue-100', 'dark:bg-blue-900', 'text-blue-800', 'dark:text-blue-200');
+      }
+    });
+  });
+}
+
 // Función para obtener ganancias agrupadas por fecha
 async function obtenerGanancias() {
-  const { data, error } = await supabase
-    .from('turnos')
-    .select('fecha, monto_cobrado')
-    .eq('negocio_id', negocioId);
+  try {
+    const { data, error } = await supabase
+      .from('turnos')
+      .select('fecha, monto_cobrado')
+      .eq('negocio_id', negocioId);
 
-  if (error) {
-    console.error('Error al obtener ingresos:', error);
+    if (error) throw error;
+
+    // Agrupar y sumar montos por fecha
+    const resumen = {};
+    data.forEach(({ fecha, monto_cobrado }) => {
+      // Validar monto_cobrado
+      const monto = Number(monto_cobrado);
+      if (!resumen[fecha]) resumen[fecha] = 0;
+      resumen[fecha] += isNaN(monto) ? 0 : monto;
+    });
+
+    // Convertir a array
+    return Object.entries(resumen).map(([fecha, ganancia]) => ({
+      Fecha: fecha,
+      Ganancia: ganancia.toFixed(2),
+    }));
+  } catch (error) {
+    mostrarNotificacion('Error', `No se pudieron obtener los datos de ganancias: ${error.message}`, 'error');
     return [];
   }
-
-  // Agrupar y sumar montos por fecha
-  const resumen = {};
-  data.forEach(({ fecha, monto_cobrado }) => {
-    // Validar monto_cobrado
-    const monto = Number(monto_cobrado);
-    if (!resumen[fecha]) resumen[fecha] = 0;
-    resumen[fecha] += isNaN(monto) ? 0 : monto;
-  });
-
-  // Convertir a array
-  return Object.entries(resumen).map(([fecha, ganancia]) => ({
-    Fecha: fecha,
-    Ganancia: ganancia.toFixed(2),
-  }));
 }
 
 // Función para exportar a Excel
 async function exportarAExcel() {
-  let ingresos = await obtenerGanancias();
+  try {
+    let ingresos = await obtenerGanancias();
 
-  if (ingresos.length === 0) {
-    alert('No hay datos para exportar');
-    return;
+    if (ingresos.length === 0) {
+      mostrarNotificacion('Sin datos', 'No hay datos para exportar', 'info');
+      return;
+    }
+
+    // Ordenar por fecha ascendente
+    ingresos = ingresos.sort((a, b) => new Date(a.Fecha) - new Date(b.Fecha));
+
+    // Calcular total general
+    const total = ingresos.reduce((sum, fila) => sum + Number(fila.Ganancia), 0);
+
+    // Agregar fila de total general
+    ingresos.push({
+      Fecha: 'TOTAL',
+      Ganancia: total.toFixed(2),
+    });
+
+    const ws = XLSX.utils.json_to_sheet(ingresos);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Ingresos');
+
+    XLSX.writeFile(wb, 'historial_ingresos.xlsx');
+    
+    mostrarNotificacion('Éxito', 'El archivo Excel ha sido generado correctamente', 'success');
+  } catch (error) {
+    mostrarNotificacion('Error', `No se pudo exportar a Excel: ${error.message}`, 'error');
   }
-
-  // Ordenar por fecha ascendente
-  ingresos = ingresos.sort((a, b) => new Date(a.Fecha) - new Date(b.Fecha));
-
-  // Calcular total general
-  const total = ingresos.reduce((sum, fila) => sum + Number(fila.Ganancia), 0);
-
-  // Agregar fila de total general
-  ingresos.push({
-    Fecha: 'TOTAL',
-    Ganancia: total.toFixed(2),
-  });
-
-  const ws = XLSX.utils.json_to_sheet(ingresos);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Ingresos');
-
-  XLSX.writeFile(wb, 'historial_ingresos.xlsx');
 }
 
 // Función para mostrar ganancias del día, semana y mes
 async function mostrarTotales() {
-  const ingresos = await obtenerGanancias();
+  try {
+    const ingresos = await obtenerGanancias();
 
-  // Obtener fechas actuales
-  const hoy = new Date();
-  const diaActual = hoy.toISOString().slice(0, 10);
+    // Obtener fechas actuales
+    const hoy = new Date();
+    const diaActual = hoy.toISOString().slice(0, 10);
 
-  // Calcular inicio de semana (lunes)
-  const primerDiaSemana = new Date(hoy);
-  primerDiaSemana.setDate(hoy.getDate() - hoy.getDay() + 1);
-  const inicioSemana = primerDiaSemana.toISOString().slice(0, 10);
+    // Calcular inicio de semana (lunes)
+    const primerDiaSemana = new Date(hoy);
+    primerDiaSemana.setDate(hoy.getDate() - hoy.getDay() + 1);
+    const inicioSemana = primerDiaSemana.toISOString().slice(0, 10);
 
-  // Calcular inicio de mes
-  const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().slice(0, 10);
+    // Calcular inicio de mes
+    const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().slice(0, 10);
 
-  let totalDia = 0, totalSemana = 0, totalMes = 0;
+    let totalDia = 0, totalSemana = 0, totalMes = 0;
 
-  ingresos.forEach(({ Fecha, Ganancia }) => {
-    if (Fecha === 'TOTAL') return; // Saltar fila de total
+    ingresos.forEach(({ Fecha, Ganancia }) => {
+      if (Fecha === 'TOTAL') return; // Saltar fila de total
 
-    if (Fecha === diaActual) totalDia += Number(Ganancia);
+      if (Fecha === diaActual) totalDia += Number(Ganancia);
 
-    if (Fecha >= inicioSemana && Fecha <= diaActual) totalSemana += Number(Ganancia);
+      if (Fecha >= inicioSemana && Fecha <= diaActual) totalSemana += Number(Ganancia);
 
-    if (Fecha >= inicioMes && Fecha <= diaActual) totalMes += Number(Ganancia);
-  });
+      if (Fecha >= inicioMes && Fecha <= diaActual) totalMes += Number(Ganancia);
+    });
 
-  document.getElementById('ganancia-dia').textContent = totalDia.toFixed(2);
-  document.getElementById('ganancia-semana').textContent = totalSemana.toFixed(2);
-  document.getElementById('ganancia-mes').textContent = totalMes.toFixed(2);
-}
-
-// Evento clic botón exportar
-document.getElementById('exportExcel').addEventListener('click', exportarAExcel);
-
-// Llama a mostrarTotales al cargar la página
-mostrarTotales();
-
-// Si tienes un formulario para agregar montos, llama a mostrarTotales() después de agregar un monto exitosamente
-document.querySelector('form').addEventListener('submit', async function(e) {
-  e.preventDefault();
-  const horaCierre = document.getElementById('hora-cierre').value;
-
-  // Guardar en Supabase
-  const { error } = await supabase
-    .from('configuracion_negocio')
-    .upsert([{ negocio_id: negocioId, hora_cierre: horaCierre }]);
-
-  if (error) {
-    alert('Error al guardar configuración');
-    return;
-  }
-
-  alert('¡Configuración guardada!');
-});
-
-window.addEventListener('DOMContentLoaded', async () => {
-  const { data, error } = await supabase
-    .from('configuracion_negocio')
-    .select('hora_cierre')
-    .eq('negocio_id', negocioId)
-    .single();
-
-  if (!error && data && data.hora_cierre) {
-    document.getElementById('hora-cierre').value = data.hora_cierre;
-  }
-});
-
-
-
-// Función para obtener hora de cierre
-async function obtenerConfiguracion() {
-  const { data, error } = await supabase
-    .from('configuracion_negocio')
-    .select('hora_cierre')
-    .eq('negocio_id', negocioId)
-    .single();
-
-  if (error) {
-    console.error('Error obteniendo configuración:', error.message);
-    return null;
-  }
-
-  return data?.hora_cierre || null;
-}
-
-
-// Función para obtener hora desde Supabase
-async function obtenerConfiguracion() {
-  const { data, error } = await supabase
-    .from('configuracion_negocio')
-    .select('hora_cierre')
-    .eq('negocio_id', negocioId)
-    .single();
-
-  if (error) {
-    console.error('Error obteniendo configuración:', error.message);
-    return null;
-  }
-  return data?.hora_cierre || null;
-}
-
-// Cargar valor en el input al iniciar
-async function cargarHoraCierre() {
-  const horaCierre = await obtenerConfiguracion();
-  const input = document.getElementById('hora-cierre');
-
-  if (horaCierre && input) {
-    input.value = horaCierre; // asigna el valor de la BD
-  }
-}
-
-cargarHoraCierre();
-
-async function actualizarHoraCierre(nuevaHora) {
-  const { error } = await supabase
-    .from('configuracion_negocio')
-    .update({ hora_cierre: nuevaHora })
-    .eq('negocio_id', negocioId);
-
-  if (error) {
-    console.error('Error actualizando hora:', error.message);
-    alert('Error al actualizar la hora');
-  } else {
-    alert('Hora de cierre actualizada correctamente');
-  }
-}
-
-// Si tienes un botón para guardar
-document.getElementById('btnGuardarHora').addEventListener('click', () => {
-  const nuevaHora = document.getElementById('hora-cierre').value;
-  if (nuevaHora) {
-    actualizarHoraCierre(nuevaHora);
-  } else {
-    alert('Debe seleccionar una hora');
-  }
-});
-
-
-
-//horario configuracion
-
-async function tomarTurno(clienteId, fecha, hora) {
-  // 1. Obtener configuración
-  const { data: config, error: configError } = await supabase
-    .from('configuracion_negocio')
-    .select('hora_apertura, hora_cierre, limite_turnos')
-    .eq('negocio_id', negocioId)
-    .single();
-
-  if (configError || !config) {
-    alert('❌ No se pudo obtener la configuración del negocio.');
-    return;
-  }
-
-  const { hora_apertura, hora_cierre, limite_turnos } = config;
-
-  // 2. Validar horario
-  if (hora < hora_apertura || hora > hora_cierre) {
-    alert(`⛔ El negocio solo atiende de ${hora_apertura} a ${hora_cierre}.`);
-    return;
-  }
-
-  // 3. Validar límite de turnos en el día
-  const { count, error: countError } = await supabase
-    .from('turnos')
-    .select('id', { count: 'exact', head: true })
-    .eq('negocio_id', negocioId)
-    .eq('fecha', fecha);
-
-  if (countError) {
-    alert('❌ Error al verificar turnos del día.');
-    return;
-  }
-
-  if (count >= limite_turnos) {
-    alert(`⛔ Se alcanzó el límite de ${limite_turnos} turnos para hoy.`);
-    return;
-  }
-
-  // 4. Insertar turno si pasa las validaciones
-  const { error: insertError } = await supabase.from('turnos').insert([
-    {
-      negocio_id: negocioId,
-      cliente_id: clienteId,
-      fecha: fecha,
-      hora: hora,
-      estado: 'pendiente'
+    // Actualizar valores en el DOM
+    document.getElementById('ganancia-dia').textContent = totalDia.toFixed(2);
+    document.getElementById('ganancia-semana').textContent = totalSemana.toFixed(2);
+    document.getElementById('ganancia-mes').textContent = totalMes.toFixed(2);
+    
+    // Actualizar barras de progreso
+    const maxGanancia = Math.max(totalDia, totalSemana, totalMes);
+    if (maxGanancia > 0) {
+      document.getElementById('barra-dia').style.width = `${(totalDia / maxGanancia) * 100}%`;
+      document.getElementById('barra-semana').style.width = `${(totalSemana / maxGanancia) * 100}%`;
+      document.getElementById('barra-mes').style.width = `${(totalMes / maxGanancia) * 100}%`;
     }
-  ]);
-
-  if (insertError) {
-    alert('❌ Error al registrar el turno.');
-  } else {
-    alert('✅ Turno registrado con éxito.');
+    
+    // Actualizar gráfico
+    actualizarGraficoIngresos(ingresos);
+  } catch (error) {
+    console.error('Error al mostrar totales:', error);
   }
 }
+
+// Inicializar gráfico de ingresos
+let ingresosChart;
+function inicializarGrafico() {
+  const ctx = document.getElementById('ingresos-chart').getContext('2d');
+  
+  // Configuración del gráfico
+  ingresosChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [{
+        label: 'Ingresos diarios',
+        data: [],
+        borderColor: getComputedStyle(document.documentElement).getPropertyValue('--color-primary-500') || '#0ea5e9',
+        backgroundColor: 'rgba(14, 165, 233, 0.1)',
+        borderWidth: 2,
+        tension: 0.3,
+        fill: true
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          display: true,
+          position: 'top',
+          labels: {
+            color: document.documentElement.classList.contains('dark') ? '#e2e8f0' : '#1e293b'
+          }
+        },
+        tooltip: {
+          mode: 'index',
+          intersect: false,
+          callbacks: {
+            label: function(context) {
+              return `Ingresos: $${context.raw}`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: {
+            color: document.documentElement.classList.contains('dark') ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
+          },
+          ticks: {
+            color: document.documentElement.classList.contains('dark') ? '#e2e8f0' : '#1e293b'
+          }
+        },
+        y: {
+          beginAtZero: true,
+          grid: {
+            color: document.documentElement.classList.contains('dark') ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
+          },
+          ticks: {
+            color: document.documentElement.classList.contains('dark') ? '#e2e8f0' : '#1e293b',
+            callback: function(value) {
+              return '$' + value;
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
+// Actualizar datos del gráfico
+function actualizarGraficoIngresos(ingresos) {
+  if (!ingresosChart) return;
+  
+  // Filtrar solo los últimos 14 días para el gráfico
+  const hoy = new Date();
+  const hace14Dias = new Date();
+  hace14Dias.setDate(hoy.getDate() - 14);
+  
+  const datosRecientes = ingresos
+    .filter(item => item.Fecha !== 'TOTAL' && new Date(item.Fecha) >= hace14Dias)
+    .sort((a, b) => new Date(a.Fecha) - new Date(b.Fecha));
+  
+  // Formatear fechas para el gráfico
+  const labels = datosRecientes.map(item => {
+    const fecha = new Date(item.Fecha);
+    return fecha.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' });
+  });
+  
+  const datos = datosRecientes.map(item => Number(item.Ganancia));
+  
+  // Actualizar el gráfico
+  ingresosChart.data.labels = labels;
+  ingresosChart.data.datasets[0].data = datos;
+  ingresosChart.update();
+}
+
+// Función para cargar configuración del negocio
+async function cargarConfiguracion() {
+  try {
+    const { data, error } = await supabase
+      .from('configuracion_negocio')
+      .select('*')
+      .eq('negocio_id', negocioId)
+      .single();
+
+    if (error) throw error;
+
+    if (data) {
+      // Establecer valores en los campos del formulario
+      if (data.hora_apertura) document.getElementById('hora-apertura').value = data.hora_apertura;
+      if (data.hora_cierre) document.getElementById('hora-cierre').value = data.hora_cierre;
+      if (data.limite_turnos) document.getElementById('limite-turnos').value = data.limite_turnos;
+      
+      // Configurar días de operación si existen
+      if (data.dias_operacion && Array.isArray(data.dias_operacion)) {
+        const dayButtons = document.querySelectorAll('.day-btn');
+        dayButtons.forEach(button => {
+          const day = parseInt(button.getAttribute('data-day'));
+          if (data.dias_operacion.includes(day)) {
+            button.classList.add('bg-blue-500', 'text-white');
+            button.classList.remove('bg-blue-100', 'dark:bg-blue-900', 'text-blue-800', 'dark:text-blue-200');
+          }
+        });
+      }
+    }
+  } catch (error) {
+    console.error('Error al cargar configuración:', error);
+  }
+}
+
+// Función para guardar configuración
+async function guardarConfiguracion(event) {
+  event.preventDefault();
+  
+  try {
+    const horaApertura = document.getElementById('hora-apertura').value;
+    const horaCierre = document.getElementById('hora-cierre').value;
+    const limiteTurnos = parseInt(document.getElementById('limite-turnos').value);
+    
+    // Obtener días seleccionados
+    const diasOperacion = [];
+    document.querySelectorAll('.day-btn').forEach(button => {
+      if (button.classList.contains('bg-blue-500')) {
+        diasOperacion.push(parseInt(button.getAttribute('data-day')));
+      }
+    });
+    
+    const { error } = await supabase
+      .from('configuracion_negocio')
+      .upsert({
+        negocio_id: negocioId,
+        hora_apertura: horaApertura,
+        hora_cierre: horaCierre,
+        limite_turnos: limiteTurnos,
+        dias_operacion: diasOperacion
+      });
+
+    if (error) throw error;
+    
+    mostrarNotificacion('Éxito', 'Configuración guardada correctamente', 'success');
+  } catch (error) {
+    mostrarNotificacion('Error', `No se pudo guardar la configuración: ${error.message}`, 'error');
+  }
+}
+
+// Función para mostrar notificaciones con SweetAlert2
+function mostrarNotificacion(titulo, mensaje, tipo) {
+  Swal.fire({
+    title: titulo,
+    text: mensaje,
+    icon: tipo, // 'success', 'error', 'warning', 'info'
+    confirmButtonColor: '#0ea5e9',
+    confirmButtonText: 'Aceptar',
+    background: document.documentElement.classList.contains('dark') ? '#1e293b' : '#ffffff',
+    color: document.documentElement.classList.contains('dark') ? '#e2e8f0' : '#1e293b'
+  });
+}
+
+// ===== FUNCIONES DE CONTROL DE BREAK =====
+
+// Inicializar controles de break
+function initBreakControl() {
+  const toggleBreakBtn = document.getElementById('toggle-break');
+  if (toggleBreakBtn) {
+    toggleBreakBtn.addEventListener('click', toggleBreak);
+  }
+}
+
+// Verificar estado actual del break desde Supabase
+async function verificarEstadoBreak() {
+  try {
+    const { data, error } = await supabase
+      .from('estado_negocio')
+      .select('*')
+      .eq('negocio_id', negocioId)
+      .single();
+
+    if (error && error.code !== 'PGRST116') {
+      throw error;
+    }
+
+    if (data && data.en_break) {
+      const endTime = new Date(data.break_end_time);
+      const now = new Date();
+      
+      if (endTime > now) {
+        // El break aún está activo
+        breakActivo = true;
+        breakEndTime = endTime;
+        actualizarUIBreak(true);
+        iniciarTemporizador();
+      } else {
+        // El break ya expiró, actualizar estado
+        await finalizarBreak();
+      }
+    } else {
+      actualizarUIBreak(false);
+    }
+  } catch (error) {
+    console.error('Error al verificar estado del break:', error);
+  }
+}
+
+// Alternar estado del break
+async function toggleBreak() {
+  if (breakActivo) {
+    await finalizarBreak();
+  } else {
+    await iniciarBreak();
+  }
+}
+
+// Iniciar break
+async function iniciarBreak() {
+  try {
+    const duracion = parseInt(document.getElementById('break-duration').value) || 30;
+    const mensaje = document.getElementById('break-message').value || 'Estamos en break, regresamos pronto...';
+    
+    const now = new Date();
+    const endTime = new Date(now.getTime() + (duracion * 60 * 1000));
+    
+    // Guardar estado en Supabase
+    const { error } = await supabase
+      .from('estado_negocio')
+      .upsert({
+        negocio_id: negocioId,
+        en_break: true,
+        break_start_time: now.toISOString(),
+        break_end_time: endTime.toISOString(),
+        break_message: mensaje,
+        updated_at: now.toISOString()
+      });
+
+    if (error) throw error;
+
+    breakActivo = true;
+    breakEndTime = endTime;
+    actualizarUIBreak(true);
+    iniciarTemporizador();
+    
+    mostrarNotificacion('Break Iniciado', `Break activo por ${duracion} minutos`, 'success');
+  } catch (error) {
+    console.error('Error al iniciar break:', error);
+    mostrarNotificacion('Error', 'No se pudo iniciar el break', 'error');
+  }
+}
+
+// Finalizar break
+async function finalizarBreak() {
+  try {
+    // Actualizar estado en Supabase
+    const { error } = await supabase
+      .from('estado_negocio')
+      .upsert({
+        negocio_id: negocioId,
+        en_break: false,
+        break_start_time: null,
+        break_end_time: null,
+        break_message: null,
+        updated_at: new Date().toISOString()
+      });
+
+    if (error) throw error;
+
+    breakActivo = false;
+    breakEndTime = null;
+    
+    if (breakInterval) {
+      clearInterval(breakInterval);
+      breakInterval = null;
+    }
+    
+    actualizarUIBreak(false);
+    mostrarNotificacion('Break Finalizado', 'El negocio está nuevamente abierto', 'success');
+  } catch (error) {
+    console.error('Error al finalizar break:', error);
+    mostrarNotificacion('Error', 'No se pudo finalizar el break', 'error');
+  }
+}
+
+// Actualizar interfaz de usuario del break
+function actualizarUIBreak(enBreak) {
+  const indicator = document.getElementById('break-indicator');
+  const text = document.getElementById('break-text');
+  const button = document.getElementById('toggle-break');
+  const buttonText = document.getElementById('break-button-text');
+  const timeRemaining = document.getElementById('break-time-remaining');
+  
+  if (enBreak) {
+    // Estado: En break
+    indicator.className = 'w-3 h-3 rounded-full bg-orange-500';
+    text.textContent = 'En Break';
+    text.className = 'font-medium text-orange-600 dark:text-orange-400';
+    button.className = 'w-full bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800 text-white px-6 py-3 rounded-lg transition-colors flex items-center justify-center font-semibold';
+    buttonText.textContent = 'Finalizar Break';
+    timeRemaining.classList.remove('hidden');
+  } else {
+    // Estado: Abierto
+    indicator.className = 'w-3 h-3 rounded-full bg-green-500';
+    text.textContent = 'Negocio Abierto';
+    text.className = 'font-medium text-green-600 dark:text-green-400';
+    button.className = 'w-full bg-orange-600 hover:bg-orange-700 dark:bg-orange-700 dark:hover:bg-orange-800 text-white px-6 py-3 rounded-lg transition-colors flex items-center justify-center font-semibold';
+    buttonText.textContent = 'Iniciar Break';
+    timeRemaining.classList.add('hidden');
+  }
+}
+
+// Iniciar temporizador del break
+function iniciarTemporizador() {
+  if (breakInterval) {
+    clearInterval(breakInterval);
+  }
+  
+  breakInterval = setInterval(() => {
+    const now = new Date();
+    const timeLeft = breakEndTime - now;
+    
+    if (timeLeft <= 0) {
+      // El break ha terminado
+      finalizarBreak();
+    } else {
+      // Actualizar tiempo restante
+      const minutes = Math.floor(timeLeft / (1000 * 60));
+      const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
+      const remainingTimeElement = document.getElementById('remaining-time');
+      if (remainingTimeElement) {
+        remainingTimeElement.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+      }
+    }
+  }, 1000);
+}
+
+// Función para verificar si el negocio está en break (para uso externo)
+async function verificarBreakActivo() {
+  try {
+    const { data, error } = await supabase
+      .from('estado_negocio')
+      .select('en_break, break_end_time, break_message')
+      .eq('negocio_id', negocioId)
+      .single();
+
+    if (error && error.code !== 'PGRST116') {
+      return { enBreak: false, mensaje: null };
+    }
+
+    if (data && data.en_break) {
+      const endTime = new Date(data.break_end_time);
+      const now = new Date();
+      
+      if (endTime > now) {
+        return { 
+          enBreak: true, 
+          mensaje: data.break_message || 'Estamos en break, regresamos pronto...',
+          tiempoRestante: Math.ceil((endTime - now) / (1000 * 60)) // en minutos
+        };
+      }
+    }
+    
+    return { enBreak: false, mensaje: null };
+  } catch (error) {
+    console.error('Error al verificar break:', error);
+    return { enBreak: false, mensaje: null };
+  }
+}
+
+// Event Listeners
+document.getElementById('exportExcel').addEventListener('click', exportarAExcel);
+document.getElementById('config-form').addEventListener('submit', guardarConfiguracion);
+
+// Exportar funciones necesarias al objeto window para acceso desde HTML
+window.exportarAExcel = exportarAExcel;
+window.mostrarTotales = mostrarTotales;
+window.guardarConfiguracion = guardarConfiguracion;
+window.verificarBreakActivo = verificarBreakActivo;
