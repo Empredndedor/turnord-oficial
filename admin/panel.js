@@ -4,6 +4,15 @@ import { supabase } from '../database.js';
 
 const negocioId = 'barberia0001';
 
+// Utilidad: fecha local YYYY-MM-DD
+function ymdLocal(dateLike) {
+  const d = new Date(dateLike);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 // Función para actualizar los contadores en el DOM
 function actualizarContadores(turnosHoy) {
   document.getElementById('turnosEspera').textContent =
@@ -44,21 +53,17 @@ function actualizarTabla(turnosHoy) {
 // Función para cargar datos y actualizar vista, devuelve los turnos del día
 async function cargarDatos() {
   try {
-    const hoy = new Date().toISOString().split('T')[0];
+    const hoy = ymdLocal(new Date());
     const { data, error } = await supabase
       .from('turnos')
       .select('*')
       .eq('negocio_id', negocioId)
+      .eq('fecha', hoy)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
 
-    const turnosHoy = data.filter(t => {
-      const fechaBase = t.fecha || t.created_at;
-      if (!fechaBase) return false;
-      const fechaTurno = new Date(fechaBase).toISOString().split('T')[0];
-      return fechaTurno === hoy;
-    });
+    const turnosHoy = data || [];
 
     actualizarContadores(turnosHoy);
     actualizarTabla(turnosHoy);
@@ -66,7 +71,16 @@ async function cargarDatos() {
     return turnosHoy;
   } catch (err) {
     console.error('Error al cargar datos:', err);
-    alert('Error al cargar los datos del panel.');
+    const tabla = document.getElementById('tablaHistorial');
+    if (tabla) {
+      tabla.innerHTML = `<tr><td colspan="4" class="py-4 text-center text-red-500">Error al cargar los datos del panel.</td></tr>`;
+    }
+    const e1 = document.getElementById('turnosEspera');
+    const e2 = document.getElementById('turnosAtendidos');
+    const e3 = document.getElementById('turnosDia');
+    if (e1) e1.textContent = '0';
+    if (e2) e2.textContent = '0';
+    if (e3) e3.textContent = '0';
     return [];
   }
 }
@@ -76,24 +90,18 @@ async function limpiarHistorialTurnos() {
   if (!confirm('¿Estás seguro que quieres limpiar el historial del día?')) return;
 
   try {
-    const hoy = new Date().toISOString().split('T')[0];
+    const hoy = ymdLocal(new Date());
 
     // Obtener ids de turnos del día para borrar
     const { data, error: fetchError } = await supabase
       .from('turnos')
-      .select('id, fecha, created_at')
-      .eq('negocio_id', negocioId);
+      .select('id')
+      .eq('negocio_id', negocioId)
+      .eq('fecha', hoy);
 
     if (fetchError) throw fetchError;
 
-    const idsAEliminar = data
-      .filter(t => {
-        const fechaBase = t.fecha || t.created_at;
-        if (!fechaBase) return false;
-        const fechaTurno = new Date(fechaBase).toISOString().split('T')[0];
-        return fechaTurno === hoy;
-      })
-      .map(t => t.id);
+    const idsAEliminar = (data || []).map(t => t.id);
 
     if (idsAEliminar.length === 0) {
       alert('No hay turnos para eliminar hoy.');

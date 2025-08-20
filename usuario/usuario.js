@@ -9,7 +9,35 @@ let telefonoUsuario = localStorage.getItem('telefonoUsuario') || null;
 
 let HORA_LIMITE_TURNOS = "23:00"; // valor por defecto
 
-async function tomarTurno(nombre, telefono, servicio) {
+// Persistencia del deadline del turno para que el contador continúe al volver a la pestaña
+function getDeadlineKey(turno) {
+  return `turnoDeadline:${negocioId}:${turno}`;
+}
+
+// Catálogo de servicios (nombre -> duracion_min)
+let serviciosCache = {};
+async function cargarServiciosActivos() {
+  try {
+    const { data, error } = await supabase
+      .from('servicios')
+      .select('nombre,duracion_min')
+      .eq('negocio_id', negocioId)
+      .eq('activo', true)
+      .order('nombre', { ascending: true });
+    if (error) throw error;
+    serviciosCache = {};
+    (data || []).forEach(s => { serviciosCache[s.nombre] = s.duracion_min; });
+    const sel = document.querySelector('select[name="tipo"]');
+    if (sel) {
+      sel.innerHTML = '<option value="">Seleccione un servicio</option>' +
+        (data || []).map(s => `<option value="${s.nombre}">${s.nombre}</option>`).join('');
+    }
+  } catch (e) {
+    console.warn('No se pudieron cargar servicios activos.', e);
+  }
+}
+
+async function tomarTurnoSimple(nombre, telefono, servicio) {
   // Verificar si el negocio está en break
   const estadoBreak = await verificarBreakNegocio();
   if (estadoBreak.enBreak) {
@@ -17,7 +45,7 @@ async function tomarTurno(nombre, telefono, servicio) {
     return;
   }
 
-  const horaCierre = await obtenerConfiguracion();
+  const horaCierre = (await obtenerConfig()).hora_cierre;
   const ahora = new Date();
   const [cierreHora, cierreMin] = horaCierre.split(':').map(Number);
 
@@ -35,7 +63,7 @@ async function tomarTurno(nombre, telefono, servicio) {
       nombre,
       telefono,
       servicio,
-      estado: 'pendiente',
+      estado: 'En espera',
       fecha: new Date().toISOString().split('T')[0],
       hora: ahora.toLocaleTimeString(),
     },
@@ -70,6 +98,7 @@ function obtenerHoraActual() {
 function cerrarModal() {
   document.getElementById('modal').classList.add('hidden');
 }
+window.cerrarModal = cerrarModal;
 
 // === Carga de configuración ===
 async function cargarHoraCierre() {
@@ -143,9 +172,56 @@ async function obtenerPosicionEnFila(turnoUsuario) {
 
 // === Mostrar mensaje de confirmación con contador ===
 async function mostrarMensajeConfirmacion(turnoData) {
-  const tiempoPorTurno = 10; // minutos
-  const posicion = await obtenerPosicionEnFila(turnoData.turno);
-  let tiempoRestante = (posicion + 1) * tiempoPorTurno * 60;
+  const deadlineKey = getDeadlineKey(turnoData.turno);
+  let deadline = Number(localStorage.getItem(deadlineKey) || 0);
+  if (!deadline || Number.isNaN(deadline) || deadline <= Date.now()) {
+    // 1) Obtener turno en atención (para añadir su remanente si aplica)
+    const hoyISO = new Date().toISOString().slice(0,10);
+    let restanteAtencion = 0;
+    try {
+      const { data: enAtencion } = await supabase
+        .from('turnos')
+        .select('servicio, started_at')
+        .eq('negocio_id', negocioId)
+        .eq('fecha', hoyISO)
+        .eq('estado', 'En atención')
+        .order('started_at', { ascending: true })
+        .limit(1);
+      if (enAtencion && enAtencion.length) {
+        const serv = enAtencion[0].servicio;
+        const dur = serviciosCache[serv] || 25;
+        const inicio = enAtencion[0].started_at ? new Date(enAtencion[0].started_at) : null;
+        if (inicio) {
+          const trans = Math.floor((Date.now() - inicio.getTime()) / 60000);
+          restanteAtencion = Math.max(dur - trans, 0);
+        } else {
+          restanteAtencion = dur;
+        }
+      }
+    } catch {}
+
+    // 2) Obtener cola en espera y sumar duraciones de los turnos por delante
+    const { data: cola } = await supabase
+      .from('turnos')
+      .select('turno, servicio')
+      .eq('negocio_id', negocioId)
+      .eq('estado', 'En espera')
+      .order('orden', { ascending: true })
+      .order('created_at', { ascending: true });
+
+    let minutosEspera = restanteAtencion;
+    if (cola && cola.length) {
+      const idx = cola.findIndex(x => x.turno === turnoData.turno);
+      const limite = idx === -1 ? cola.length : idx; // si no está aún en la cola, toma todos
+      for (let i = 0; i < limite; i++) {
+        const serv = cola[i].servicio;
+        minutosEspera += (serviciosCache[serv] || 25);
+      }
+    }
+
+    deadline = Date.now() + (minutosEspera * 60 * 1000);
+    localStorage.setItem(deadlineKey, String(deadline));
+  }
 
   const mensajeContenedor = document.getElementById('mensaje-turno');
   mensajeContenedor.innerHTML = `
@@ -162,15 +238,16 @@ async function mostrarMensajeConfirmacion(turnoData) {
   if (intervaloContador) clearInterval(intervaloContador);
 
   function actualizarContador() {
-    const minutos = Math.floor(tiempoRestante / 60);
-    const segundos = tiempoRestante % 60;
+    const restante = Math.ceil((deadline - Date.now()) / 1000);
+    const segundosPos = Math.max(0, restante);
+    const minutos = Math.floor(segundosPos / 60);
+    const segundos = segundosPos % 60;
     tiempoSpan.textContent = `${minutos} min ${segundos < 10 ? '0' : ''}${segundos} seg`;
 
-    if (tiempoRestante <= 0) {
+    if (restante <= 0) {
       tiempoSpan.textContent = `🎉 Prepárate, tu turno está muy cerca.`;
       clearInterval(intervaloContador);
     }
-    tiempoRestante--;
   }
 
   actualizarContador();
@@ -201,6 +278,7 @@ async function mostrarMensajeConfirmacion(turnoData) {
     document.querySelector('button[onclick*="modal"]').disabled = false;
     turnoAsignado = null;
     clearInterval(intervaloContador);
+    localStorage.removeItem(deadlineKey);
     localStorage.removeItem('telefonoUsuario');
     telefonoUsuario = null;
     await actualizarTurnoActualYConteo();
@@ -229,11 +307,23 @@ async function actualizarTurnoActualYConteo() {
 
 // === Inicialización al cargar la página ===
 window.addEventListener('DOMContentLoaded', async () => {
+  await cargarServiciosActivos();
   await cargarHoraCierre();
 
   const fechaElem = document.getElementById('fecha-de-hoy');
   const btnTomarTurno = document.querySelector('button[onclick*="modal"]');
   const form = document.getElementById('formRegistroNegocio');
+
+  // Estado de break inicial
+  const estadoBreakInicial = await verificarBreakNegocio();
+  if (estadoBreakInicial.enBreak) {
+    btnTomarTurno.disabled = true;
+    btnTomarTurno.classList.add('opacity-50','cursor-not-allowed');
+    mostrarNotificacionBreak(estadoBreakInicial.mensaje, estadoBreakInicial.tiempoRestante);
+  } else {
+    btnTomarTurno.disabled = false;
+    btnTomarTurno.classList.remove('opacity-50','cursor-not-allowed');
+  }
 
   // Mostrar fecha
   fechaElem.textContent = new Date().toLocaleDateString('es-DO', {
@@ -261,6 +351,13 @@ window.addEventListener('DOMContentLoaded', async () => {
   // Registro de nuevo turno
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
+
+    // Verificar si el negocio está en break
+    const estadoBreak = await verificarBreakNegocio();
+    if (estadoBreak.enBreak) {
+      mostrarNotificacionBreak(estadoBreak.mensaje, estadoBreak.tiempoRestante);
+      return;
+    }
 
     const ahora = new Date();
     const horaActual = ahora.toTimeString().slice(0, 5);
@@ -351,11 +448,37 @@ window.addEventListener('DOMContentLoaded', async () => {
             turnoAsignado = null;
             btnTomarTurno.disabled = false;
             if (intervaloContador) clearInterval(intervaloContador);
+            localStorage.removeItem(getDeadlineKey(data.turno));
             localStorage.removeItem('telefonoUsuario');
             telefonoUsuario = null;
           }
         }
         await actualizarTurnoActualYConteo();
+      }
+    )
+    .subscribe();
+
+  // Suscripción al estado de negocio (break)
+  supabase
+    .channel('estado-negocio-usuario')
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'estado_negocio',
+        filter: `negocio_id=eq.${negocioId}`,
+      },
+      async () => {
+        const estado = await verificarBreakNegocio();
+        if (estado.enBreak) {
+          btnTomarTurno.disabled = true;
+          btnTomarTurno.classList.add('opacity-50','cursor-not-allowed');
+          mostrarNotificacionBreak(estado.mensaje, estado.tiempoRestante);
+        } else {
+          btnTomarTurno.disabled = false;
+          btnTomarTurno.classList.remove('opacity-50','cursor-not-allowed');
+        }
       }
     )
     .subscribe();
@@ -504,7 +627,7 @@ export async function tomarTurno(nombre, telefono, servicio, fechaISO, horaHHMM)
       nombre,
       telefono,
       servicio,
-      estado: 'pendiente',
+      estado: 'En espera',
       fecha: fechaISO,
       hora: horaHHMM,
       created_at: ahora.toISOString()

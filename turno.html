@@ -60,7 +60,7 @@
         <a href="panel.html" class="block hover:text-blue-300 rounded px-3 py-2">Inicio</a>
         <a href="turno.html" class="block bg-white text-blue-900 dark:bg-gray-700 dark:text-white font-semibold rounded px-3 py-2 shadow">Turnos</a>
         <a href="negocio.html" class="block hover:text-blue-300 rounded px-3 py-2">Mi negocio</a>
-        <a href="#" class="block hover:text-blue-300 rounded px-3 py-2">Configuración</a>
+        <a href="configuracion.html" class="block hover:text-blue-300 rounded px-3 py-2">Configuración</a>
         <a href="/cierre.html" id="cerrarSesion" class="block hover:text-red-400 mt-6 rounded px-3 py-2">Cerrar sesión</a>
       </nav>
     </aside>
@@ -128,12 +128,20 @@
           </svg>
           Devolver Turno
         </button>
-        <button onclick="abrirModalCobro()" class="bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-800 text-white py-3 rounded-xl font-semibold shadow-md transition-all flex items-center justify-center gap-2">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
-          </svg>
-          Avanzar Turno
-        </button>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <button onclick="atenderAhora()" class="bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-800 text-white py-3 rounded-xl font-semibold shadow-md transition-all flex items-center justify-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c0-1.105.895-2 2-2h4a2 2 0 012 2v5a2 2 0 01-2 2h-4a2 2 0 01-2-2v-5zM7 9h3m-3 4h3" />
+            </svg>
+            Atender
+          </button>
+          <button onclick="abrirModalCobro()" class="bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 text-white py-3 rounded-xl font-semibold shadow-md transition-all flex items-center justify-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+            </svg>
+            Avanzar Turno
+          </button>
+        </div>
         <button onclick="abrirModal()" class="bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 text-white py-3 rounded-xl font-semibold shadow-md transition-all flex items-center justify-center gap-2">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />

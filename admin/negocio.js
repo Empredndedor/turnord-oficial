@@ -364,7 +364,7 @@ async function guardarConfiguracion(event) {
         hora_cierre: horaCierre,
         limite_turnos: limiteTurnos,
         dias_operacion: diasOperacion
-      });
+      }, { onConflict: 'negocio_id' });
 
     if (error) throw error;
     
@@ -460,7 +460,7 @@ async function iniciarBreak() {
         break_end_time: endTime.toISOString(),
         break_message: mensaje,
         updated_at: now.toISOString()
-      });
+      }, { onConflict: 'negocio_id' });
 
     if (error) throw error;
 
@@ -489,7 +489,7 @@ async function finalizarBreak() {
         break_end_time: null,
         break_message: null,
         updated_at: new Date().toISOString()
-      });
+      }, { onConflict: 'negocio_id' });
 
     if (error) throw error;
 

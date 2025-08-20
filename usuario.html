@@ -93,8 +93,7 @@
             <div class="md:col-span-2">
               <label class="block text-sm font-medium mb-1 dark:text-gray-300">Servicio</label>
               <select name="tipo" required class="w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 dark:bg-gray-700 dark:text-white">
-                <option value="">Selecciona</option>
-                <option>Barbería</option>
+                <option value="">Seleccione un servicio</option>
               </select>
             </div>
           </div>
@@ -114,7 +113,28 @@
   <div id="listaEspera" class="space-y-2 mt-4"></div>
 
   <!-- Archivo JS principal -->
-  <script type="module" src="usuario.js"></script>
+  <script type="module" src="./usuario/usuario.js"></script>
+  <noscript>
+    <div style="position:fixed;top:0;left:0;right:0;background:#dc2626;color:#fff;padding:10px;text-align:center;z-index:9999">
+      Esta página requiere JavaScript habilitado para funcionar.
+    </div>
+  </noscript>
+  <div id="app-error" style="display:none;position:fixed;bottom:10px;left:10px;right:10px;background:#fee2e2;color:#991b1b;padding:10px;border-radius:8px;z-index:9999"></div>
+  <script>
+    window.addEventListener('error', function(e) {
+      const box = document.getElementById('app-error');
+      if (!box) return;
+      box.style.display = 'block';
+      box.textContent = 'Error: ' + (e.message || 'Error en la aplicación. Revisa la consola.');
+    });
+    window.addEventListener('unhandledrejection', function(e) {
+      const box = document.getElementById('app-error');
+      if (!box) return;
+      box.style.display = 'block';
+      const msg = (e.reason && (e.reason.message || e.reason)) || 'Promesa rechazada no manejada.';
+      box.textContent = 'Error: ' + msg;
+    });
+  </script>
 
   <!-- Script para manejar el modo oscuro -->
   <script>

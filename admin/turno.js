@@ -5,6 +5,45 @@ let turnoActual = null;
 let HORA_LIMITE_TURNOS = "23:00"; // valor por defecto
 let chart = null; // Variable para almacenar la instancia del gráfico
 
+// Cache de servicios (nombre -> duracion_min)
+let serviciosCache = {};
+async function cargarServicios() {
+  try {
+    const { data, error } = await supabase
+      .from('servicios')
+      .select('nombre,duracion_min')
+      .eq('negocio_id', negocioId)
+      .eq('activo', true);
+    if (error) throw error;
+    serviciosCache = {};
+    (data || []).forEach(s => { serviciosCache[s.nombre] = s.duracion_min; });
+    // Poblar select de servicios si existe en esta vista
+    const sel = document.getElementById('servicio');
+    if (sel && data && data.length) {
+      sel.innerHTML = '<option value="">Seleccione un servicio</option>' +
+        data.map(s => `<option value="${s.nombre}">${s.nombre}</option>`).join('');
+    }
+  } catch (e) {
+    console.warn('No se pudieron cargar servicios, usando fallback.', e);
+  }
+}
+
+// Cargar hora límite desde configuracion_negocio
+async function cargarHoraLimite() {
+  try {
+    const { data } = await supabase
+      .from('configuracion_negocio')
+      .select('hora_cierre')
+      .eq('negocio_id', negocioId)
+      .maybeSingle();
+    if (data && data.hora_cierre) {
+      HORA_LIMITE_TURNOS = data.hora_cierre;
+    }
+  } catch (e) {
+    console.warn('No se pudo cargar hora límite, usando valor por defecto.', e);
+  }
+}
+
 // Inicialización cuando el DOM está listo
 document.addEventListener('DOMContentLoaded', async () => {
   // Inicializar modo oscuro
@@ -13,6 +52,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Inicializar fecha y hora actual
   actualizarFechaHora();
   setInterval(actualizarFechaHora, 60000); // Actualizar cada minuto
+
+  // Cargar configuración
+  await cargarHoraLimite();
+  // Cargar servicios activos
+  await cargarServicios();
   
   // Cargar turnos y estadísticas
   await cargarTurnos();
@@ -37,6 +81,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     overlay.classList.toggle('opacity-0');
     overlay.classList.toggle('pointer-events-none');
   }
+
+  // Suscripción en tiempo real para que la vista se actualice al instante
+  suscribirseTurnos();
 });
 
 // Función para inicializar el toggle de tema oscuro/claro
@@ -109,8 +156,7 @@ async function tomarTurno(event) {
     servicio: servicio,
     estado: 'En espera',
     hora: horaStr,
-    fecha: hoy,
-    tiempo_espera_estimado: calcularTiempoEsperaEstimado(servicio)
+    fecha: hoy
   }]);
 
   if (error) {
@@ -127,24 +173,23 @@ async function tomarTurno(event) {
 
 // Calcular tiempo de espera estimado basado en el servicio
 function calcularTiempoEsperaEstimado(servicio) {
-  // Tiempos estimados en minutos por servicio
+  // Si hay catálogo cargado, úsalo
+  if (serviciosCache && serviciosCache[servicio]) return serviciosCache[servicio];
+  // Fallback si no hay catálogo
   const tiemposServicio = {
     'Barbería': 30,
     'Corte de cabello': 20,
     'Afeitado': 15,
     'Tratamiento facial': 40
   };
-  
-  return tiemposServicio[servicio] || 25; // 25 minutos por defecto
+  return tiemposServicio[servicio] || 25;
 }
 
 // Generar el próximo turno disponible
 async function generarNuevoTurno() {
-  const hoy = new Date().toISOString().slice(0, 10);
-
   const { data, error } = await supabase
     .from('turnos')
-    .select('turno, fecha')
+    .select('turno')
     .eq('negocio_id', negocioId)
     .order('created_at', { ascending: false })
     .limit(1);
@@ -154,12 +199,10 @@ async function generarNuevoTurno() {
     return 'A01';
   }
 
-  // Si no hay turnos, o el último turno es de otro día, reinicia a A01
-  if (!data || data.length === 0 || !data[0].fecha || data[0].fecha !== hoy) {
+  if (!data || data.length === 0 || !data[0].turno) {
     return 'A01';
   }
 
-  // Si es el mismo día, incrementa el número
   const ultimo = data[0].turno;
   const letra = ultimo.charAt(0);
   const numero = parseInt(ultimo.substring(1)) + 1;
@@ -172,11 +215,25 @@ async function generarNuevoTurno() {
 async function cargarTurnos() {
   console.log("cargarTurnos llamada");
 
+  const hoy = new Date().toISOString().slice(0, 10);
+
+  // Buscar si hay un turno actualmente en atención
+  const { data: enAtencion, error: errAt } = await supabase
+    .from('turnos')
+    .select('*')
+    .eq('estado', 'En atención')
+    .eq('negocio_id', negocioId)
+    .eq('fecha', hoy)
+    .order('started_at', { ascending: true })
+    .limit(1);
+
+  // Cargar cola de espera
   const { data, error } = await supabase
     .from('turnos')
     .select('*')
     .eq('estado', 'En espera')
     .eq('negocio_id', negocioId)
+    .order('orden', { ascending: true })
     .order('created_at', { ascending: true });
 
   if (error) {
@@ -241,21 +298,37 @@ async function cargarTurnos() {
     lista.appendChild(div);
   });
 
-  turnoActual = data.length > 0 ? data[0] : null;
-  
+  // Determinar turno actual: en atención si existe, si no el primero en espera
+  turnoActual = (enAtencion && enAtencion.length > 0) ? enAtencion[0] : (data.length > 0 ? data[0] : null);
+
   // Actualizar información del turno actual
   document.getElementById('turnoActual').textContent = turnoActual ? turnoActual.turno : '--';
-  
+
   const clienteActual = document.getElementById('cliente-actual');
   if (clienteActual) {
     clienteActual.textContent = turnoActual ? turnoActual.nombre : '-';
   }
-  
+
   const tiempoEstimado = document.getElementById('tiempo-estimado');
-  if (tiempoEstimado && turnoActual) {
-    tiempoEstimado.textContent = `${turnoActual.tiempo_espera_estimado || 25} min`;
-  } else if (tiempoEstimado) {
-    tiempoEstimado.textContent = '-';
+  if (tiempoEstimado) {
+    if (turnoActual) {
+      if (turnoActual.estado === 'En atención') {
+        // Mostrar que está en atención actualmente
+        const inicio = turnoActual.started_at ? new Date(turnoActual.started_at) : null;
+        if (inicio) {
+          const trans = Math.max(0, Math.floor((Date.now() - inicio.getTime()) / 60000));
+          tiempoEstimado.textContent = `En atención · ${trans} min`;
+        } else {
+          tiempoEstimado.textContent = `En atención`;
+        }
+      } else {
+        // Estimado por servicio
+        const mins = (serviciosCache && serviciosCache[turnoActual.servicio]) ? serviciosCache[turnoActual.servicio] : 25;
+        tiempoEstimado.textContent = `${mins} min`;
+      }
+    } else {
+      tiempoEstimado.textContent = '-';
+    }
   }
   
   console.log("Turno actual:", turnoActual);
@@ -264,7 +337,7 @@ async function cargarTurnos() {
   if (data.length > 0) {
     const tiempoPromedio = document.getElementById('tiempo-promedio');
     if (tiempoPromedio) {
-      const tiemposEstimados = data.map(t => t.tiempo_espera_estimado || 25);
+      const tiemposEstimados = data.map(t => (serviciosCache && serviciosCache[t.servicio]) ? serviciosCache[t.servicio] : 25);
       const promedio = tiemposEstimados.reduce((a, b) => a + b, 0) / tiemposEstimados.length;
       tiempoPromedio.textContent = `${Math.round(promedio)} min`;
     }
@@ -450,6 +523,21 @@ async function cargarEstadisticas() {
   });
 }
 
+// Suscripción en tiempo real a cambios en turnos
+function suscribirseTurnos() {
+  supabase
+    .channel('turnos-admin')
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'turnos', filter: `negocio_id=eq.${negocioId}` },
+      async () => {
+        await cargarTurnos();
+        await cargarEstadisticas();
+      }
+    )
+    .subscribe();
+}
+
 // Modal para tomar turno
 function abrirModal() {
   console.log("abrirModal llamada");
@@ -482,6 +570,26 @@ function cerrarModalCobro() {
   document.getElementById('modalCobro').classList.add('hidden');
   document.getElementById('modalCobro').classList.remove('flex');
   document.getElementById('formCobro').reset();
+}
+
+// Atender ahora
+async function atenderAhora() {
+  if (!turnoActual) {
+    mostrarNotificacion('No hay turno en espera.', 'warning');
+    return;
+  }
+  const { error } = await supabase
+    .from('turnos')
+    .update({ estado: 'En atención', started_at: new Date().toISOString() })
+    .eq('id', turnoActual.id)
+    .eq('estado', 'En espera');
+  if (error) {
+    mostrarNotificacion('Error al atender: ' + error.message, 'error');
+    return;
+  }
+  mostrarNotificacion(`Atendiendo turno ${turnoActual.turno}`, 'success');
+  await cargarTurnos();
+  await cargarEstadisticas();
 }
 
 // Guardar el cobro e indicar que el turno fue atendido
@@ -520,16 +628,32 @@ async function devolverTurno() {
     return;
   }
 
-  // Confirmar antes de devolver
-  if (!confirm(`¿Estás seguro de devolver el turno ${turnoActual.turno}?`)) {
+  if (!confirm(`¿Enviar el turno ${turnoActual.turno} al final de la cola?`)) {
     return;
   }
 
-  // Cambiamos estado a 'Devuelto' para indicar que se pone al final
+  const ahoraISO = new Date().toISOString();
+
+  // Mantener 'En espera' y actualizar created_at para mandarlo al final
+  // mover al final: orden = MAX(orden)+1 para hoy
+  const hoy = new Date().toISOString().slice(0, 10);
+  const { data: maxData, error: maxErr } = await supabase
+    .from('turnos')
+    .select('orden')
+    .eq('negocio_id', negocioId)
+    .eq('fecha', hoy)
+    .order('orden', { ascending: false })
+    .limit(1);
+  if (maxErr) {
+    mostrarNotificacion('Error al devolver turno: ' + maxErr.message, 'error');
+    return;
+  }
+  const nextOrden = (maxData && maxData.length ? maxData[0].orden : 0) + 1;
   const { error } = await supabase
     .from('turnos')
-    .update({ estado: 'Devuelto' })
-    .eq('id', turnoActual.id);
+    .update({ orden: nextOrden })
+    .eq('id', turnoActual.id)
+    .eq('estado', 'En espera');
 
   if (error) {
     mostrarNotificacion('Error al devolver turno: ' + error.message, 'error');
@@ -537,7 +661,7 @@ async function devolverTurno() {
     return;
   }
 
-  mostrarNotificacion(`Turno ${turnoActual.turno} devuelto`, 'info');
+  mostrarNotificacion(`Turno ${turnoActual.turno} enviado al final de la cola`, 'info');
   await cargarTurnos();
   await cargarEstadisticas();
 }
@@ -575,3 +699,4 @@ window.abrirModalCobro = abrirModalCobro;
 window.cerrarModalCobro = cerrarModalCobro;
 window.guardarCobro = guardarCobro;
 window.devolverTurno = devolverTurno;
+window.atenderAhora = atenderAhora;
