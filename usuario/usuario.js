@@ -8,6 +8,11 @@ let intervaloContador = null;
 let telefonoUsuario = localStorage.getItem('telefonoUsuario') || null;
 
 let HORA_LIMITE_TURNOS = "23:00"; // valor por defecto
+let configCache = {
+  hora_apertura: "08:00",
+  hora_cierre: "23:00",
+  limite_turnos: 50
+};
 
 // Persistencia del deadline del turno para que el contador continúe al volver a la pestaña
 function getDeadlineKey(turno) {
@@ -45,15 +50,39 @@ async function tomarTurnoSimple(nombre, telefono, servicio) {
     return;
   }
 
-  const horaCierre = (await obtenerConfig()).hora_cierre;
+  // Usar configuración del cache actualizada en tiempo real
+  const horaCierre = configCache.hora_cierre;
+  const horaApertura = configCache.hora_apertura;
+  const limiteTurnos = configCache.limite_turnos;
+  
   const ahora = new Date();
+  const [aperturaHora, aperturaMin] = horaApertura.split(':').map(Number);
   const [cierreHora, cierreMin] = horaCierre.split(':').map(Number);
 
+  // Verificar horario de apertura
+  if (
+    ahora.getHours() < aperturaHora ||
+    (ahora.getHours() === aperturaHora && ahora.getMinutes() < aperturaMin)
+  ) {
+    alert(`Aún no hemos abierto. Horario de atención: ${horaApertura} - ${horaCierre}`);
+    return;
+  }
+
+  // Verificar horario de cierre
   if (
     ahora.getHours() > cierreHora ||
     (ahora.getHours() === cierreHora && ahora.getMinutes() > cierreMin)
   ) {
-    alert('Ya hemos cerrado, no se pueden tomar más turnos.');
+    alert(`Ya hemos cerrado. Horario de atención: ${horaApertura} - ${horaCierre}`);
+    return;
+  }
+
+  // Verificar límite de turnos del día
+  const fechaHoy = new Date().toISOString().split('T')[0];
+  const turnosHoy = await contarTurnosDia(fechaHoy);
+  
+  if (turnosHoy >= limiteTurnos) {
+    alert(`Se ha alcanzado el límite de ${limiteTurnos} turnos para hoy.`);
     return;
   }
 
@@ -64,7 +93,7 @@ async function tomarTurnoSimple(nombre, telefono, servicio) {
       telefono,
       servicio,
       estado: 'En espera',
-      fecha: new Date().toISOString().split('T')[0],
+      fecha: fechaHoy,
       hora: ahora.toLocaleTimeString(),
     },
   ]);
@@ -170,37 +199,40 @@ async function obtenerPosicionEnFila(turnoUsuario) {
   return index;
 }
 
-// === Mostrar mensaje de confirmación con contador ===
-async function mostrarMensajeConfirmacion(turnoData) {
-  const deadlineKey = getDeadlineKey(turnoData.turno);
-  let deadline = Number(localStorage.getItem(deadlineKey) || 0);
-  if (!deadline || Number.isNaN(deadline) || deadline <= Date.now()) {
-    // 1) Obtener turno en atención (para añadir su remanente si aplica)
-    const hoyISO = new Date().toISOString().slice(0,10);
-    let restanteAtencion = 0;
-    try {
-      const { data: enAtencion } = await supabase
-        .from('turnos')
-        .select('servicio, started_at')
-        .eq('negocio_id', negocioId)
-        .eq('fecha', hoyISO)
-        .eq('estado', 'En atención')
-        .order('started_at', { ascending: true })
-        .limit(1);
-      if (enAtencion && enAtencion.length) {
-        const serv = enAtencion[0].servicio;
-        const dur = serviciosCache[serv] || 25;
-        const inicio = enAtencion[0].started_at ? new Date(enAtencion[0].started_at) : null;
-        if (inicio) {
-          const trans = Math.floor((Date.now() - inicio.getTime()) / 60000);
-          restanteAtencion = Math.max(dur - trans, 0);
-        } else {
-          restanteAtencion = dur;
-        }
-      }
-    } catch {}
+// Calcular tiempo estimado total considerando todos los servicios en cola
+async function calcularTiempoEstimadoTotal(turnoObjetivo = null) {
+  const hoy = new Date().toISOString().slice(0, 10);
+  let tiempoTotal = 0;
 
-    // 2) Obtener cola en espera y sumar duraciones de los turnos por delante
+  // 1) Obtener tiempo restante del turno en atención
+  try {
+    const { data: enAtencion } = await supabase
+      .from('turnos')
+      .select('servicio, started_at')
+      .eq('negocio_id', negocioId)
+      .eq('fecha', hoy)
+      .eq('estado', 'En atención')
+      .order('started_at', { ascending: true })
+      .limit(1);
+
+    if (enAtencion && enAtencion.length) {
+      const servicio = enAtencion[0].servicio;
+      const duracionTotal = serviciosCache[servicio] || 25;
+      const inicio = enAtencion[0].started_at ? new Date(enAtencion[0].started_at) : null;
+      
+      if (inicio) {
+        const transcurrido = Math.floor((Date.now() - inicio.getTime()) / 60000);
+        tiempoTotal = Math.max(duracionTotal - transcurrido, 0);
+      } else {
+        tiempoTotal = duracionTotal;
+      }
+    }
+  } catch (error) {
+    console.warn('Error calculando tiempo de atención:', error);
+  }
+
+  // 2) Obtener cola de espera y sumar tiempos de servicios
+  try {
     const { data: cola } = await supabase
       .from('turnos')
       .select('turno, servicio')
@@ -209,16 +241,33 @@ async function mostrarMensajeConfirmacion(turnoData) {
       .order('orden', { ascending: true })
       .order('created_at', { ascending: true });
 
-    let minutosEspera = restanteAtencion;
     if (cola && cola.length) {
-      const idx = cola.findIndex(x => x.turno === turnoData.turno);
-      const limite = idx === -1 ? cola.length : idx; // si no está aún en la cola, toma todos
-      for (let i = 0; i < limite; i++) {
-        const serv = cola[i].servicio;
-        minutosEspera += (serviciosCache[serv] || 25);
+      // Si se especifica un turno objetivo, solo sumar hasta ese turno
+      const limite = turnoObjetivo ? 
+        cola.findIndex(t => t.turno === turnoObjetivo) : 
+        cola.length;
+      
+      const turnosASumar = limite === -1 ? cola : cola.slice(0, limite);
+      
+      for (const turno of turnosASumar) {
+        const duracionServicio = serviciosCache[turno.servicio] || 25;
+        tiempoTotal += duracionServicio;
       }
     }
+  } catch (error) {
+    console.warn('Error calculando tiempo de cola:', error);
+  }
 
+  return tiempoTotal;
+}
+
+// === Mostrar mensaje de confirmación con contador ===
+async function mostrarMensajeConfirmacion(turnoData) {
+  const deadlineKey = getDeadlineKey(turnoData.turno);
+  let deadline = Number(localStorage.getItem(deadlineKey) || 0);
+  if (!deadline || Number.isNaN(deadline) || deadline <= Date.now()) {
+    // Usar el nuevo cálculo de tiempo estimado mejorado
+    const minutosEspera = await calcularTiempoEstimadoTotal(turnoData.turno);
     deadline = Date.now() + (minutosEspera * 60 * 1000);
     localStorage.setItem(deadlineKey, String(deadline));
   }
@@ -307,6 +356,9 @@ async function actualizarTurnoActualYConteo() {
 
 // === Inicialización al cargar la página ===
 window.addEventListener('DOMContentLoaded', async () => {
+  // Cargar configuración inicial en el cache
+  await actualizarConfiguracion();
+  
   await cargarServiciosActivos();
   await cargarHoraCierre();
 
@@ -361,7 +413,13 @@ window.addEventListener('DOMContentLoaded', async () => {
 
     const ahora = new Date();
     const horaActual = ahora.toTimeString().slice(0, 5);
-    if (horaActual >= HORA_LIMITE_TURNOS) {
+    const apertura = configCache.hora_apertura;
+    const cierre = configCache.hora_cierre;
+    if (horaActual < apertura) {
+      alert(`Aún no hemos abierto. Horario de atención: ${apertura} - ${cierre}`);
+      return;
+    }
+    if (horaActual >= cierre) {
       alert('Ya no se pueden tomar turnos a esta hora. Intenta mañana.');
       return;
     }
@@ -482,6 +540,23 @@ window.addEventListener('DOMContentLoaded', async () => {
       }
     )
     .subscribe();
+
+  // Suscripción a cambios de configuración del negocio
+  supabase
+    .channel('configuracion-negocio-usuario')
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'configuracion_negocio',
+        filter: `negocio_id=eq.${negocioId}`,
+      },
+      async () => {
+        await actualizarConfiguracion();
+      }
+    )
+    .subscribe();
 });
 
 
@@ -505,7 +580,64 @@ async function obtenerConfig() {
     .single();
 
   if (error) throw new Error(error.message);
+  
+  // Actualizar cache
+  if (data) {
+    configCache = { ...data };
+    HORA_LIMITE_TURNOS = data.hora_cierre;
+  }
+  
   return data;
+}
+
+// Función para actualizar configuración en tiempo real
+async function actualizarConfiguracion() {
+  try {
+    const config = await obtenerConfig();
+    
+    // Mostrar notificación de cambio
+    mostrarNotificacionConfiguracion(
+      'Configuración actualizada',
+      `Horarios: ${config.hora_apertura} - ${config.hora_cierre} | Límite: ${config.limite_turnos} turnos`
+    );
+    
+    console.log('Configuración actualizada:', config);
+  } catch (error) {
+    console.error('Error al actualizar configuración:', error);
+  }
+}
+
+// Función para mostrar notificaciones de configuración
+function mostrarNotificacionConfiguracion(titulo, mensaje) {
+  const notificacion = document.createElement('div');
+  notificacion.className = 'fixed top-4 right-4 bg-blue-500 text-white px-6 py-4 rounded-lg shadow-lg z-50 max-w-sm';
+  notificacion.innerHTML = `
+    <div class="flex items-start">
+      <div class="flex-shrink-0">
+        <svg class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      </div>
+      <div class="ml-3">
+        <p class="text-sm font-medium">${titulo}</p>
+        <p class="text-sm text-blue-100 mt-1">${mensaje}</p>
+      </div>
+      <button onclick="this.parentElement.parentElement.remove()" class="ml-4 text-blue-200 hover:text-white">
+        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+  `;
+  
+  document.body.appendChild(notificacion);
+  
+  // Auto-remover después de 5 segundos
+  setTimeout(() => {
+    if (notificacion.parentElement) {
+      notificacion.remove();
+    }
+  }, 5000);
 }
 
 // Cuenta turnos de una fecha YYYY-MM-DD
@@ -602,21 +734,21 @@ export async function tomarTurno(nombre, telefono, servicio, fechaISO, horaHHMM)
       return;
     }
 
-    const cfg = await obtenerConfig();
-    const aperturaMin = hhmmToMinutes(cfg.hora_apertura);
-    const cierreMin   = hhmmToMinutes(cfg.hora_cierre);
+    // Usar configuración del cache actualizada en tiempo real
+    const aperturaMin = hhmmToMinutes(configCache.hora_apertura);
+    const cierreMin   = hhmmToMinutes(configCache.hora_cierre);
     const horaMin     = hhmmToMinutes(horaHHMM);
 
     // Validar hora dentro del horario [apertura, cierre]
     if (horaMin < aperturaMin || horaMin > cierreMin) {
-      alert(`⛔ El negocio solo atiende de ${cfg.hora_apertura} a ${cfg.hora_cierre}.`);
+      alert(`⛔ El negocio solo atiende de ${configCache.hora_apertura} a ${configCache.hora_cierre}.`);
       return;
     }
 
     // Límite diario
     const usados = await contarTurnosDia(fechaISO);
-    if (usados >= cfg.limite_turnos) {
-      alert(`⛔ Se alcanzó el límite de ${cfg.limite_turnos} turnos para ${fechaISO}.`);
+    if (usados >= configCache.limite_turnos) {
+      alert(`⛔ Se alcanzó el límite de ${configCache.limite_turnos} turnos para ${fechaISO}.`);
       return;
     }
 

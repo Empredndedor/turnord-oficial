@@ -2,6 +2,7 @@ import { supabase } from '../database.js';
 
 const negocioId = 'barberia0001';
 let turnoActual = null;
+let HORA_APERTURA = "08:00"; // valor por defecto
 let HORA_LIMITE_TURNOS = "23:00"; // valor por defecto
 let chart = null; // Variable para almacenar la instancia del gráfico
 
@@ -33,14 +34,15 @@ async function cargarHoraLimite() {
   try {
     const { data } = await supabase
       .from('configuracion_negocio')
-      .select('hora_cierre')
+      .select('hora_apertura, hora_cierre')
       .eq('negocio_id', negocioId)
       .maybeSingle();
-    if (data && data.hora_cierre) {
-      HORA_LIMITE_TURNOS = data.hora_cierre;
+    if (data) {
+      if (data.hora_apertura) HORA_APERTURA = data.hora_apertura;
+      if (data.hora_cierre) HORA_LIMITE_TURNOS = data.hora_cierre;
     }
   } catch (e) {
-    console.warn('No se pudo cargar hora límite, usando valor por defecto.', e);
+    console.warn('No se pudo cargar horario, usando valores por defecto.', e);
   }
 }
 
@@ -122,10 +124,14 @@ async function tomarTurno(event) {
   event.preventDefault();
   console.log("tomarTurno llamada");
 
-  // Validar hora límite
+  // Validar horario de apertura y cierre
   const ahora = new Date();
   const horaActual = ahora.toTimeString().slice(0,5);
   const horaStr = ahora.toLocaleTimeString('es-ES', { hour12: false });  // formato 24h "HH:mm:ss"
+  if (horaActual < HORA_APERTURA) {
+    mostrarNotificacion(`Aún no hemos abierto. Horario: ${HORA_APERTURA} - ${HORA_LIMITE_TURNOS}`, 'error');
+    return;
+  }
   if (horaActual >= HORA_LIMITE_TURNOS) {
     mostrarNotificacion('Ya no se pueden tomar turnos a esta hora. Intenta mañana.', 'error');
     return;
@@ -183,6 +189,68 @@ function calcularTiempoEsperaEstimado(servicio) {
     'Tratamiento facial': 40
   };
   return tiemposServicio[servicio] || 25;
+}
+
+// Calcular tiempo estimado total considerando todos los servicios en cola
+async function calcularTiempoEstimadoTotal(turnoObjetivo = null) {
+  const hoy = new Date().toISOString().slice(0, 10);
+  let tiempoTotal = 0;
+
+  // 1) Obtener tiempo restante del turno en atención
+  try {
+    const { data: enAtencion } = await supabase
+      .from('turnos')
+      .select('servicio, started_at')
+      .eq('negocio_id', negocioId)
+      .eq('fecha', hoy)
+      .eq('estado', 'En atención')
+      .order('started_at', { ascending: true })
+      .limit(1);
+
+    if (enAtencion && enAtencion.length) {
+      const servicio = enAtencion[0].servicio;
+      const duracionTotal = serviciosCache[servicio] || 25;
+      const inicio = enAtencion[0].started_at ? new Date(enAtencion[0].started_at) : null;
+      
+      if (inicio) {
+        const transcurrido = Math.floor((Date.now() - inicio.getTime()) / 60000);
+        tiempoTotal = Math.max(duracionTotal - transcurrido, 0);
+      } else {
+        tiempoTotal = duracionTotal;
+      }
+    }
+  } catch (error) {
+    console.warn('Error calculando tiempo de atención:', error);
+  }
+
+  // 2) Obtener cola de espera y sumar tiempos de servicios
+  try {
+    const { data: cola } = await supabase
+      .from('turnos')
+      .select('turno, servicio')
+      .eq('negocio_id', negocioId)
+      .eq('estado', 'En espera')
+      .order('orden', { ascending: true })
+      .order('created_at', { ascending: true });
+
+    if (cola && cola.length) {
+      // Si se especifica un turno objetivo, solo sumar hasta ese turno
+      const limite = turnoObjetivo ? 
+        cola.findIndex(t => t.turno === turnoObjetivo) : 
+        cola.length;
+      
+      const turnosASumar = limite === -1 ? cola : cola.slice(0, limite);
+      
+      for (const turno of turnosASumar) {
+        const duracionServicio = serviciosCache[turno.servicio] || 25;
+        tiempoTotal += duracionServicio;
+      }
+    }
+  } catch (error) {
+    console.warn('Error calculando tiempo de cola:', error);
+  }
+
+  return tiempoTotal;
 }
 
 // Generar el próximo turno disponible
@@ -273,15 +341,19 @@ async function cargarTurnos() {
     sinTurnos.classList.add('hidden');
   }
 
-  // Crear tarjetas de turnos
-  data.forEach((t, index) => {
+  // Crear tarjetas de turnos con tiempo estimado mejorado
+  for (let index = 0; index < data.length; index++) {
+    const t = data[index];
     const div = document.createElement('div');
     div.className = 'bg-blue-50 dark:bg-blue-900/30 p-4 rounded-lg shadow-sm border border-blue-100 dark:border-blue-800 transition-all hover:shadow-md';
     
-    // Calcular tiempo de espera
+    // Calcular tiempo de espera real (desde creación)
     const horaCreacion = new Date(`${t.fecha}T${t.hora}`);
     const ahora = new Date();
-    const minutosEspera = Math.floor((ahora - horaCreacion) / 60000);
+    const minutosEsperaReal = Math.floor((ahora - horaCreacion) / 60000);
+    
+    // Calcular tiempo estimado hasta que le toque (basado en servicios)
+    const tiempoEstimadoHasta = await calcularTiempoEstimadoTotal(t.turno);
     
     div.innerHTML = `
       <div class="flex justify-between items-start">
@@ -291,12 +363,15 @@ async function cargarTurnos() {
       <p class="text-gray-700 dark:text-gray-300 font-medium mt-2 truncate">${t.nombre || 'Cliente'}</p>
       <div class="flex justify-between items-center mt-3">
         <span class="text-xs text-gray-500 dark:text-gray-400">${t.servicio || 'Servicio'}</span>
-        <span class="text-xs text-gray-500 dark:text-gray-400">Espera: ${minutosEspera} min</span>
+        <div class="text-right">
+          <span class="text-xs text-gray-500 dark:text-gray-400 block">Esperando: ${minutosEsperaReal} min</span>
+          <span class="text-xs text-blue-600 dark:text-blue-400 font-medium">ETA: ${tiempoEstimadoHasta} min</span>
+        </div>
       </div>
     `;
     
     lista.appendChild(div);
-  });
+  }
 
   // Determinar turno actual: en atención si existe, si no el primero en espera
   turnoActual = (enAtencion && enAtencion.length > 0) ? enAtencion[0] : (data.length > 0 ? data[0] : null);
@@ -333,12 +408,13 @@ async function cargarTurnos() {
   
   console.log("Turno actual:", turnoActual);
   
-  // Calcular tiempo promedio de espera
+  // Calcular tiempo promedio de espera mejorado
   if (data.length > 0) {
     const tiempoPromedio = document.getElementById('tiempo-promedio');
     if (tiempoPromedio) {
-      const tiemposEstimados = data.map(t => (serviciosCache && serviciosCache[t.servicio]) ? serviciosCache[t.servicio] : 25);
-      const promedio = tiemposEstimados.reduce((a, b) => a + b, 0) / tiemposEstimados.length;
+      // Calcular el tiempo total acumulado de todos los servicios en cola
+      const tiempoTotalCola = await calcularTiempoEstimadoTotal();
+      const promedio = data.length > 0 ? tiempoTotalCola / data.length : 0;
       tiempoPromedio.textContent = `${Math.round(promedio)} min`;
     }
   }
