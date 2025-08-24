@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Gestión de Turnos - TurnoRD</title>
+  <script src="assets/theme.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -31,6 +32,16 @@
       }
     }
   </script>
+<style>
+    /* Safe area para dispositivos con notch */
+    body { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
+    /* Evitar overflow en contenedores flex y grids */
+    * { min-width: 0; }
+    /* Medios escalables */
+    img, canvas, svg, video { max-width: 100%; height: auto; }
+    /* Contenedor responsive utilitario */
+    .responsive-container { max-width: 1280px; margin-left: auto; margin-right: auto; padding-left: 1rem; padding-right: 1rem; }
+  </style>
 </head>
 <body class="bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-100 transition-colors duration-200">
   <div class="flex min-h-screen relative">
@@ -69,7 +80,7 @@
     <div id="sidebar-overlay" class="fixed inset-0 bg-black opacity-0 pointer-events-none transition-opacity duration-200 ease-in-out md:hidden z-20"></div>
 
     <!-- Contenido principal -->
-    <main class="flex-1 md:ml-64 p-6 space-y-6">
+    <main class="flex-1 md:ml-64 p-4 sm:p-6 space-y-6 responsive-container w-full">
       <div class="flex justify-between items-center mb-6">
         <h1 class="text-2xl font-bold">Gestión de Turnos</h1>
         <div class="text-sm text-gray-600 dark:text-gray-400">

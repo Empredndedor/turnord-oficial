@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Panel Administrativo - TurnoRD</title>
+  <script src="assets/theme.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     // Inicializar modo oscuro
@@ -23,6 +24,16 @@
       }
     }
   </script>
+<style>
+  /* Safe area para dispositivos con notch */
+  body { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
+  /* Evitar overflow en contenedores flex y grids */
+  * { min-width: 0; }
+  /* Medios escalables */
+  img, canvas, svg, video { max-width: 100%; height: auto; }
+  /* Contenedor responsive utilitario */
+  .responsive-container { max-width: 1280px; margin-left: auto; margin-right: auto; padding-left: 1rem; padding-right: 1rem; }
+</style>
 </head>
 <body class="bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200">
   <!-- Botón modo oscuro -->
@@ -49,7 +60,7 @@
     </aside>
 
     <!-- Contenido principal -->
-    <main class="flex-1 p-6">
+    <main class="flex-1 p-4 sm:p-6 responsive-container w-full">
       <h1 class="text-2xl font-bold mb-6">Bienvenido, Administrador</h1>
 
       <!-- Resumen -->
