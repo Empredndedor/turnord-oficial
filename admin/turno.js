@@ -182,10 +182,30 @@ async function tomarTurno(event) {
 
   const turnoGenerado = await generarNuevoTurno();
 
+  // Verificación de unicidad para evitar turnos duplicados por condiciones de carrera
+  let nuevoTurno = turnoGenerado;
+  try {
+    while (true) {
+      const hoyCheck = new Date().toISOString().slice(0, 10);
+      const { data: existe } = await supabase
+        .from('turnos')
+        .select('id')
+        .eq('negocio_id', negocioId)
+        .eq('fecha', hoyCheck)
+        .eq('turno', nuevoTurno)
+        .limit(1);
+      if (!existe || !existe.length) break;
+      const num = parseInt(nuevoTurno.substring(1) || '0', 10) + 1;
+      nuevoTurno = nuevoTurno[0] + String(num).padStart(2, '0');
+    }
+  } catch (e) {
+    console.warn('No se pudo verificar duplicidad del turno, se usará el generado.');
+  }
+
   const hoy = new Date().toISOString().slice(0, 10);
   const { error } = await supabase.from('turnos').insert([{
     negocio_id: negocioId,
-    turno: turnoGenerado,
+    turno: nuevoTurno,
     nombre: nombre,
     telefono: telefono,
     servicio: servicio,
@@ -201,7 +221,7 @@ async function tomarTurno(event) {
   }
 
   cerrarModal();
-  mostrarNotificacion(`Turno ${turnoGenerado} registrado para ${nombre}`, 'success');
+  mostrarNotificacion(`Turno ${nuevoTurno} registrado para ${nombre}`, 'success');
   refrescarUI();
 }
 
@@ -353,6 +373,18 @@ async function cargarTurnos() {
     return;
   }
 
+  // Deduplicar por código de turno (evita mostrar dos filas con el mismo código)
+  const listaOriginal = data || [];
+  const seenTurnos = new Set();
+  const dataRender = [];
+  for (const t of listaOriginal) {
+    if (!t || !t.turno) continue;
+    if (!seenTurnos.has(t.turno)) {
+      seenTurnos.add(t.turno);
+      dataRender.push(t);
+    }
+  }
+
   const lista = document.getElementById('listaEspera');
   const sinTurnos = document.getElementById('sin-turnos');
   const contadorEspera = document.getElementById('contador-espera');
@@ -362,31 +394,31 @@ async function cargarTurnos() {
   
   // Actualizar contador
   if (contadorEspera) {
-    contadorEspera.textContent = `${data.length} turno${data.length !== 1 ? 's' : ''}`;
+    contadorEspera.textContent = `${dataRender.length} turno${dataRender.length !== 1 ? 's' : ''}`;
   }
   
   if (turnosEsperaElement) {
-    turnosEsperaElement.textContent = data.length;
+    turnosEsperaElement.textContent = dataRender.length;
   }
   
   // Actualizar barra de progreso
   const cargaEspera = document.getElementById('carga-espera');
   if (cargaEspera) {
     // Calcular porcentaje de carga (máximo 100% a partir de 10 turnos)
-    const porcentaje = Math.min(data.length * 10, 100);
+    const porcentaje = Math.min(dataRender.length * 10, 100);
     cargaEspera.style.width = `${porcentaje}%`;
   }
 
   // Mostrar mensaje si no hay turnos
-  if (data.length === 0 && sinTurnos) {
+  if (dataRender.length === 0 && sinTurnos) {
     sinTurnos.classList.remove('hidden');
   } else if (sinTurnos) {
     sinTurnos.classList.add('hidden');
   }
 
   // Crear tarjetas de turnos con tiempo estimado mejorado
-  for (let index = 0; index < data.length; index++) {
-    const t = data[index];
+  for (let index = 0; index < dataRender.length; index++) {
+    const t = dataRender[index];
     const div = document.createElement('div');
     div.className = 'bg-blue-50 dark:bg-blue-900/30 p-4 rounded-lg shadow-sm border border-blue-100 dark:border-blue-800 transition-all hover:shadow-md';
     
@@ -417,7 +449,7 @@ async function cargarTurnos() {
   }
 
   // Determinar turno actual: en atención si existe, si no el primero en espera
-  turnoActual = (enAtencion && enAtencion.length > 0) ? enAtencion[0] : (data.length > 0 ? data[0] : null);
+  turnoActual = (enAtencion && enAtencion.length > 0) ? enAtencion[0] : (dataRender.length > 0 ? dataRender[0] : null);
 
   // Actualizar información del turno actual
   document.getElementById('turnoActual').textContent = turnoActual ? turnoActual.turno : '--';
@@ -452,12 +484,12 @@ async function cargarTurnos() {
   console.log("Turno actual:", turnoActual);
   
   // Calcular tiempo promedio de espera mejorado
-  if (data.length > 0) {
+  if (dataRender.length > 0) {
     const tiempoPromedio = document.getElementById('tiempo-promedio');
     if (tiempoPromedio) {
       // Calcular el tiempo total acumulado de todos los servicios en cola
       const tiempoTotalCola = await calcularTiempoEstimadoTotal();
-      const promedio = data.length > 0 ? tiempoTotalCola / data.length : 0;
+      const promedio = dataRender.length > 0 ? tiempoTotalCola / dataRender.length : 0;
       tiempoPromedio.textContent = `${Math.round(promedio)} min`;
     }
   }
