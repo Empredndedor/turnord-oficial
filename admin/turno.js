@@ -6,9 +6,11 @@ let HORA_APERTURA = "08:00"; // valor por defecto
 let HORA_LIMITE_TURNOS = "23:00"; // valor por defecto
 let LIMITE_TURNOS = 50; // valor por defecto
 let chart = null; // Variable para almacenar la instancia del gráfico
+let ALLOWED_DAYS = [1,2,3,4,5,6];
 
 // Unificar refrescos de UI para evitar llamadas duplicadas
 let __refreshTimer = null;
+let __elapsedTimer = null;
 function refrescarUI() {
   if (__refreshTimer) return;
   __refreshTimer = setTimeout(async () => {
@@ -46,13 +48,14 @@ async function cargarHoraLimite() {
   try {
     const { data } = await supabase
       .from('configuracion_negocio')
-      .select('hora_apertura, hora_cierre, limite_turnos')
+      .select('hora_apertura, hora_cierre, limite_turnos, dias_operacion')
       .eq('negocio_id', negocioId)
       .maybeSingle();
     if (data) {
       if (data.hora_apertura) HORA_APERTURA = data.hora_apertura;
       if (data.hora_cierre) HORA_LIMITE_TURNOS = data.hora_cierre;
       if (typeof data.limite_turnos === 'number') LIMITE_TURNOS = data.limite_turnos;
+      if (Array.isArray(data.dias_operacion)) ALLOWED_DAYS = data.dias_operacion;
     }
   } catch (e) {
     console.warn('No se pudo cargar horario, usando valores por defecto.', e);
@@ -98,6 +101,29 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Suscripción en tiempo real para que la vista se actualice al instante
   suscribirseTurnos();
+
+  // Iniciar actualizador de minuteros (espera/en atención)
+  iniciarActualizadorMinutos();
+
+  // Suscripción a cambios de configuración (días operacionales, horarios)
+  supabase
+    .channel('config-turno-admin')
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'configuracion_negocio', filter: `negocio_id=eq.${negocioId}` },
+      async () => {
+        await cargarHoraLimite();
+        refrescarUI();
+      }
+    )
+    .subscribe();
+
+  // Recarga automática cada 15 segundos
+  setInterval(() => {
+    try {
+      location.reload();
+    } catch (_) {}
+  }, 15000);
 });
 
 // Función para inicializar el toggle de tema oscuro/claro
@@ -120,6 +146,41 @@ function initThemeToggle() {
   });
 }
 
+// Actualizador de minuteros (espera/en atención)
+function iniciarActualizadorMinutos() {
+  if (__elapsedTimer) clearInterval(__elapsedTimer);
+  actualizarMinuteros();
+  __elapsedTimer = setInterval(actualizarMinuteros, 30000);
+}
+
+function actualizarMinuteros() {
+  try {
+    // Actualizar 'Esperando' en tarjetas
+    const spans = document.querySelectorAll('.esperando-min');
+    const ahora = Date.now();
+    spans.forEach(sp => {
+      const iso = sp.getAttribute('data-creado-iso');
+      if (!iso) return;
+      const t = new Date(iso);
+      const mins = Math.max(0, Math.floor((ahora - t.getTime()) / 60000));
+      sp.textContent = String(mins);
+    });
+
+    // Actualizar 'En atención' si aplica
+    const tEst = document.getElementById('tiempo-estimado');
+    if (tEst && tEst.dataset && tEst.dataset.startedIso) {
+      const inicio = new Date(tEst.dataset.startedIso);
+      if (!isNaN(inicio)) {
+        const trans = Math.max(0, Math.floor((Date.now() - inicio.getTime()) / 60000));
+        tEst.textContent = `En atención · ${trans} min`;
+      }
+    }
+  } catch (e) {
+    // evitar romper el bucle
+    console.warn('Error actualizando minuteros', e);
+  }
+}
+
 // Función para actualizar la fecha y hora actual
 function actualizarFechaHora() {
   const ahora = new Date();
@@ -132,10 +193,26 @@ function actualizarFechaHora() {
   document.getElementById('hora-actual').textContent = horaFormateada;
 }
 
+// Días operacionales helpers
+function getDiaOperacionIndex(date = new Date()) {
+  // JS: 0=Domingo, 1=Lunes ... 6=Sábado
+  return date.getDay();
+}
+function esDiaOperativo(date = new Date()) {
+  const idx = getDiaOperacionIndex(date);
+  return Array.isArray(ALLOWED_DAYS) ? ALLOWED_DAYS.includes(idx) : true;
+}
+
 // Tomar turno manual desde el modal
 async function tomarTurno(event) {
   event.preventDefault();
   console.log("tomarTurno llamada");
+
+  // Validar día operacional
+  if (!esDiaOperativo(new Date())) {
+    mostrarNotificacion('Hoy no es un día operacional.', 'error');
+    return;
+  }
 
   // Validar horario de apertura y cierre
   const ahora = new Date();
@@ -439,7 +516,7 @@ async function cargarTurnos() {
       <div class="flex justify-between items-center mt-3">
         <span class="text-xs text-gray-500 dark:text-gray-400">${t.servicio || 'Servicio'}</span>
         <div class="text-right">
-          <span class="text-xs text-gray-500 dark:text-gray-400 block">Esperando: ${minutosEsperaReal} min</span>
+          <span class="text-xs text-gray-500 dark:text-gray-400 block">Esperando: <span class="esperando-min" data-creado-iso="${t.fecha}T${t.hora}">${minutosEsperaReal}</span> min</span>
           <span class="text-xs text-blue-600 dark:text-blue-400 font-medium">ETA: ${tiempoEstimadoHasta} min</span>
         </div>
       </div>
@@ -467,16 +544,20 @@ async function cargarTurnos() {
         const inicio = turnoActual.started_at ? new Date(turnoActual.started_at) : null;
         if (inicio) {
           const trans = Math.max(0, Math.floor((Date.now() - inicio.getTime()) / 60000));
+          tiempoEstimado.dataset.startedIso = turnoActual.started_at;
           tiempoEstimado.textContent = `En atención · ${trans} min`;
         } else {
+          tiempoEstimado.dataset.startedIso = '';
           tiempoEstimado.textContent = `En atención`;
         }
       } else {
         // Estimado por servicio
         const mins = (serviciosCache && serviciosCache[turnoActual.servicio]) ? serviciosCache[turnoActual.servicio] : 25;
+        delete tiempoEstimado.dataset.startedIso;
         tiempoEstimado.textContent = `${mins} min`;
       }
     } else {
+      delete tiempoEstimado.dataset.startedIso;
       tiempoEstimado.textContent = '-';
     }
   }
