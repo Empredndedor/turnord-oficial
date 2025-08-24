@@ -83,9 +83,7 @@ function initDayButtons() {
   
   dayButtons.forEach(button => {
     button.addEventListener('click', () => {
-      // Si es domingo (data-day="0"), no permitir selección
-      if (button.getAttribute('data-day') === '0') return;
-      
+      // Permitir todos los días, incluido domingo (data-day="0")
       button.classList.toggle('bg-blue-500');
       button.classList.toggle('text-white');
       

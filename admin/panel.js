@@ -50,15 +50,21 @@ function actualizarTabla(turnosHoy) {
   });
 }
 
+// Utilidad: día UTC YYYY-MM-DD
+function ymdUTC(dateLike) {
+  return new Date(dateLike).toISOString().slice(0, 10);
+}
+
 // Función para cargar datos y actualizar vista, devuelve los turnos del día
 async function cargarDatos() {
   try {
-    const hoy = ymdLocal(new Date());
+    const hoyLocal = ymdLocal(new Date());
+    const hoyUTC = ymdUTC(new Date());
     const { data, error } = await supabase
       .from('turnos')
       .select('*')
       .eq('negocio_id', negocioId)
-      .eq('fecha', hoy)
+      .or(`fecha.eq.${hoyUTC},fecha.eq.${hoyLocal}`)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -97,14 +103,15 @@ async function limpiarHistorialTurnos() {
 
   try {
     btn && (btn.disabled = true, btn.textContent = 'Limpiando...');
-    const hoy = ymdLocal(new Date());
+    const hoyLocal = ymdLocal(new Date());
+    const hoyUTC = ymdUTC(new Date());
 
-    // Borrar directamente por negocio y fecha actual
+    // Borrar directamente por negocio y fecha actual (cubriendo UTC y Local)
     const { error: deleteError } = await supabase
       .from('turnos')
       .delete()
       .eq('negocio_id', negocioId)
-      .eq('fecha', hoy);
+      .or(`fecha.eq.${hoyUTC},fecha.eq.${hoyLocal}`);
 
     if (deleteError) throw deleteError;
 
