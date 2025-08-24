@@ -4,18 +4,14 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Configuración - TurnoRD</title>
+  <script src="assets/theme.js"></script>
+  <script>
+    // Habilitar modo oscuro por clase en Tailwind CDN
+    window.tailwind = window.tailwind || {};
+    window.tailwind.config = { darkMode: 'class' };
+  </script>
   <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    :root { --color-primary-500:#0ea5e9; --color-primary-600:#0284c7; --color-primary-700:#0369a1; }
-    .theme-red    { --color-primary-500:#ef4444; --color-primary-600:#dc2626; --color-primary-700:#b91c1c; }
-    .theme-orange { --color-primary-500:#f97316; --color-primary-600:#ea580c; --color-primary-700:#c2410c; }
-    .theme-blue   { --color-primary-500:#0ea5e9; --color-primary-600:#0284c7; --color-primary-700:#0369a1; }
-    .theme-black  { --color-primary-500:#334155; --color-primary-600:#1f2937; --color-primary-700:#0f172a; }
-    .theme-green  { --color-primary-500:#22c55e; --color-primary-600:#16a34a; --color-primary-700:#15803d; }
-    .theme-pink   { --color-primary-500:#ec4899; --color-primary-600:#db2777; --color-primary-700:#be185d; }
-    .theme-purple { --color-primary-500:#8b5cf6; --color-primary-600:#7c3aed; --color-primary-700:#6d28d9; }
-  </style>
-</head>
+  </head>
 <body class="bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-100 min-h-screen">
   <div class="flex min-h-screen relative">
     <!-- Overlay para móvil -->

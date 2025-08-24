@@ -4,7 +4,19 @@ const negocioId = 'barberia0001';
 let turnoActual = null;
 let HORA_APERTURA = "08:00"; // valor por defecto
 let HORA_LIMITE_TURNOS = "23:00"; // valor por defecto
+let LIMITE_TURNOS = 50; // valor por defecto
 let chart = null; // Variable para almacenar la instancia del gráfico
+
+// Unificar refrescos de UI para evitar llamadas duplicadas
+let __refreshTimer = null;
+function refrescarUI() {
+  if (__refreshTimer) return;
+  __refreshTimer = setTimeout(async () => {
+    __refreshTimer = null;
+    await cargarTurnos();
+    await cargarEstadisticas();
+  }, 100);
+}
 
 // Cache de servicios (nombre -> duracion_min)
 let serviciosCache = {};
@@ -34,12 +46,13 @@ async function cargarHoraLimite() {
   try {
     const { data } = await supabase
       .from('configuracion_negocio')
-      .select('hora_apertura, hora_cierre')
+      .select('hora_apertura, hora_cierre, limite_turnos')
       .eq('negocio_id', negocioId)
       .maybeSingle();
     if (data) {
       if (data.hora_apertura) HORA_APERTURA = data.hora_apertura;
       if (data.hora_cierre) HORA_LIMITE_TURNOS = data.hora_cierre;
+      if (typeof data.limite_turnos === 'number') LIMITE_TURNOS = data.limite_turnos;
     }
   } catch (e) {
     console.warn('No se pudo cargar horario, usando valores por defecto.', e);
@@ -61,12 +74,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   await cargarServicios();
   
   // Cargar turnos y estadísticas
-  await cargarTurnos();
-  await cargarEstadisticas();
+  refrescarUI();
   
   // Configurar eventos
-  document.getElementById('refrescar-turnos')?.addEventListener('click', async () => {
-    await cargarTurnos();
+  document.getElementById('refrescar-turnos')?.addEventListener('click', () => {
+    refrescarUI();
     mostrarNotificacion('Turnos actualizados', 'success');
   });
   
@@ -114,8 +126,9 @@ function actualizarFechaHora() {
   const opciones = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
   const fechaFormateada = ahora.toLocaleDateString('es-ES', opciones);
   const horaFormateada = ahora.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+  const letraHoy = obtenerLetraDelDia();
   
-  document.getElementById('fecha-actual').textContent = fechaFormateada.charAt(0).toUpperCase() + fechaFormateada.slice(1);
+  document.getElementById('fecha-actual').innerHTML = `${fechaFormateada.charAt(0).toUpperCase() + fechaFormateada.slice(1)} <span class="text-blue-600 dark:text-blue-400 font-bold">(Serie ${letraHoy})</span>`;
   document.getElementById('hora-actual').textContent = horaFormateada;
 }
 
@@ -151,6 +164,22 @@ async function tomarTurno(event) {
 
   const servicio = document.getElementById('servicio').value;
 
+  // Verificar límite de turnos del día
+  const fechaHoy = new Date().toISOString().slice(0, 10);
+  const { count: totalHoy, error: countError } = await supabase
+    .from('turnos')
+    .select('id', { count: 'exact', head: true })
+    .eq('negocio_id', negocioId)
+    .eq('fecha', fechaHoy);
+  if (countError) {
+    mostrarNotificacion('No se pudo validar el límite de turnos.', 'error');
+    return;
+  }
+  if ((totalHoy || 0) >= LIMITE_TURNOS) {
+    mostrarNotificacion(`Se alcanzó el límite de ${LIMITE_TURNOS} turnos para hoy.`, 'warning');
+    return;
+  }
+
   const turnoGenerado = await generarNuevoTurno();
 
   const hoy = new Date().toISOString().slice(0, 10);
@@ -173,8 +202,7 @@ async function tomarTurno(event) {
 
   cerrarModal();
   mostrarNotificacion(`Turno ${turnoGenerado} registrado para ${nombre}`, 'success');
-  await cargarTurnos();
-  await cargarEstadisticas();
+  refrescarUI();
 }
 
 // Calcular tiempo de espera estimado basado en el servicio
@@ -253,28 +281,43 @@ async function calcularTiempoEstimadoTotal(turnoObjetivo = null) {
   return tiempoTotal;
 }
 
+// Función para obtener la letra del día basada en la fecha
+function obtenerLetraDelDia() {
+  const hoy = new Date();
+  const fechaBase = new Date('2024-08-23'); // Fecha base donde A = día 0
+  const diferenciaDias = Math.floor((hoy - fechaBase) / (1000 * 60 * 60 * 24));
+  const indiceDia = diferenciaDias % 26; // Ciclo de 26 letras (A-Z)
+  const letra = String.fromCharCode(65 + Math.abs(indiceDia)); // 65 = 'A'
+  return letra;
+}
+
 // Generar el próximo turno disponible
 async function generarNuevoTurno() {
+  const letraHoy = obtenerLetraDelDia();
+  const fechaHoy = new Date().toISOString().slice(0, 10);
+  
+  // Buscar el último turno del día actual con la letra correspondiente
   const { data, error } = await supabase
     .from('turnos')
     .select('turno')
     .eq('negocio_id', negocioId)
+    .eq('fecha', fechaHoy)
+    .like('turno', `${letraHoy}%`)
     .order('created_at', { ascending: false })
     .limit(1);
 
   if (error) {
     console.error('Error al generar turno:', error.message);
-    return 'A01';
+    return `${letraHoy}01`;
   }
 
   if (!data || data.length === 0 || !data[0].turno) {
-    return 'A01';
+    return `${letraHoy}01`;
   }
 
   const ultimo = data[0].turno;
-  const letra = ultimo.charAt(0);
   const numero = parseInt(ultimo.substring(1)) + 1;
-  const nuevoTurno = `${letra}${numero.toString().padStart(2, '0')}`;
+  const nuevoTurno = `${letraHoy}${numero.toString().padStart(2, '0')}`;
   console.log("Nuevo turno generado:", nuevoTurno);
   return nuevoTurno;
 }
@@ -606,9 +649,8 @@ function suscribirseTurnos() {
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'turnos', filter: `negocio_id=eq.${negocioId}` },
-      async () => {
-        await cargarTurnos();
-        await cargarEstadisticas();
+      () => {
+        refrescarUI();
       }
     )
     .subscribe();
@@ -664,8 +706,7 @@ async function atenderAhora() {
     return;
   }
   mostrarNotificacion(`Atendiendo turno ${turnoActual.turno}`, 'success');
-  await cargarTurnos();
-  await cargarEstadisticas();
+  refrescarUI();
 }
 
 // Guardar el cobro e indicar que el turno fue atendido
@@ -691,9 +732,8 @@ async function guardarCobro(event) {
   }
 
   cerrarModalCobro();
-  mostrarNotificacion(`Turno ${turnoActual.turno} finalizado con cobro de RD$${monto}`, 'success');
-  await cargarTurnos();
-  await cargarEstadisticas();
+  mostrarNotificacion(`Turno ${turnoActual.turno} finalizado con cobro de RD${monto}`, 'success');
+  refrescarUI();
 }
 
 // Devolver turno al final de la cola
@@ -738,8 +778,7 @@ async function devolverTurno() {
   }
 
   mostrarNotificacion(`Turno ${turnoActual.turno} enviado al final de la cola`, 'info');
-  await cargarTurnos();
-  await cargarEstadisticas();
+  refrescarUI();
 }
 
 // Función para mostrar notificaciones con SweetAlert2

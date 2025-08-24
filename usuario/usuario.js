@@ -142,21 +142,36 @@ async function cargarHoraCierre() {
   }
 }
 
+// Función para obtener la letra del día basada en la fecha
+function obtenerLetraDelDia() {
+  const hoy = new Date();
+  const fechaBase = new Date('2024-08-23'); // Fecha base donde A = día 0
+  const diferenciaDias = Math.floor((hoy - fechaBase) / (1000 * 60 * 60 * 24));
+  const indiceDia = diferenciaDias % 26; // Ciclo de 26 letras (A-Z)
+  const letra = String.fromCharCode(65 + Math.abs(indiceDia)); // 65 = 'A'
+  return letra;
+}
+
 // === Generar nuevo turno ===
 async function generarNuevoTurno() {
+  const letraHoy = obtenerLetraDelDia();
+  const fechaHoy = new Date().toISOString().slice(0, 10);
+  
+  // Buscar el último turno del día actual con la letra correspondiente
   const { data, error } = await supabase
     .from('turnos')
     .select('turno')
     .eq('negocio_id', negocioId)
+    .eq('fecha', fechaHoy)
+    .like('turno', `${letraHoy}%`)
     .order('created_at', { ascending: false })
     .limit(1);
 
-  if (error || !data || data.length === 0) return 'A01';
+  if (error || !data || data.length === 0) return `${letraHoy}01`;
 
   const ultimo = data[0].turno;
-  const letra = ultimo.charAt(0);
   const numero = parseInt(ultimo.substring(1)) + 1;
-  return `${letra}${numero.toString().padStart(2, '0')}`;
+  return `${letraHoy}${numero.toString().padStart(2, '0')}`;
 }
 
 // === Verificar si el usuario ya tiene un turno activo ===
@@ -378,12 +393,14 @@ window.addEventListener('DOMContentLoaded', async () => {
   }
 
   // Mostrar fecha
-  fechaElem.textContent = new Date().toLocaleDateString('es-DO', {
+  const fechaTexto = new Date().toLocaleDateString('es-DO', {
     weekday: 'long',
     year: 'numeric',
     month: 'long',
     day: 'numeric',
   });
+  const letraHoy = obtenerLetraDelDia();
+  fechaElem.innerHTML = `${fechaTexto} <span class="text-blue-600 dark:text-blue-400 font-bold">(Turnos serie ${letraHoy})</span>`;
 
   // Validaciones en tiempo real
   document.getElementById('telefono').addEventListener('input', function () {
