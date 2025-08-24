@@ -80,18 +80,23 @@ function toggleMobileMenu() {
 // Inicializar botones de días de operación
 function initDayButtons() {
   const dayButtons = document.querySelectorAll('.day-btn');
+
+  const applySelected = (btn, selected) => {
+    // Limpiar posibles clases grises heredadas del domingo
+    btn.classList.remove('bg-gray-100', 'dark:bg-gray-700', 'text-gray-400');
+    if (selected) {
+      btn.classList.add('bg-blue-500', 'text-white');
+      btn.classList.remove('bg-blue-100', 'dark:bg-blue-900', 'text-blue-800', 'dark:text-blue-200');
+    } else {
+      btn.classList.remove('bg-blue-500', 'text-white');
+      btn.classList.add('bg-blue-100', 'dark:bg-blue-900', 'text-blue-800', 'dark:text-blue-200');
+    }
+  };
   
   dayButtons.forEach(button => {
     button.addEventListener('click', () => {
-      // Permitir todos los días, incluido domingo (data-day="0")
-      button.classList.toggle('bg-blue-500');
-      button.classList.toggle('text-white');
-      
-      if (button.classList.contains('bg-blue-500')) {
-        button.classList.remove('bg-blue-100', 'dark:bg-blue-900', 'text-blue-800', 'dark:text-blue-200');
-      } else {
-        button.classList.add('bg-blue-100', 'dark:bg-blue-900', 'text-blue-800', 'dark:text-blue-200');
-      }
+      const willSelect = !button.classList.contains('bg-blue-500');
+      applySelected(button, willSelect);
     });
   });
 }
@@ -322,12 +327,19 @@ async function cargarConfiguracion() {
       
       // Configurar días de operación si existen
       if (data.dias_operacion && Array.isArray(data.dias_operacion)) {
+        const selectedDays = data.dias_operacion.map(n => Number(n)).filter(n => !Number.isNaN(n));
         const dayButtons = document.querySelectorAll('.day-btn');
         dayButtons.forEach(button => {
           const day = parseInt(button.getAttribute('data-day'));
-          if (data.dias_operacion.includes(day)) {
+          const selected = selectedDays.includes(day);
+          // Unificar estilo seleccionado/no seleccionado y limpiar grises de domingo
+          button.classList.remove('bg-gray-100', 'dark:bg-gray-700', 'text-gray-400');
+          if (selected) {
             button.classList.add('bg-blue-500', 'text-white');
             button.classList.remove('bg-blue-100', 'dark:bg-blue-900', 'text-blue-800', 'dark:text-blue-200');
+          } else {
+            button.classList.remove('bg-blue-500', 'text-white');
+            button.classList.add('bg-blue-100', 'dark:bg-blue-900', 'text-blue-800', 'dark:text-blue-200');
           }
         });
       }

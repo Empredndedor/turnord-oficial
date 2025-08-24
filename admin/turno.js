@@ -99,8 +99,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     overlay.classList.toggle('pointer-events-none');
   }
 
-  // Suscripción en tiempo real para que la vista se actualice al instante
-  suscribirseTurnos();
+  // Nota: La suscripción en tiempo real se maneja en panel.js para evitar duplicaciones
 
   // Iniciar actualizador de minuteros (espera/en atención)
   iniciarActualizadorMinutos();
