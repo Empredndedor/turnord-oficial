@@ -99,7 +99,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     overlay.classList.toggle('pointer-events-none');
   }
 
-  // Nota: La suscripción en tiempo real se maneja en panel.js para evitar duplicaciones
+  // Suscripción en tiempo real para que la vista se actualice al instante
+  suscribirseTurnos();
 
   // Iniciar actualizador de minuteros (espera/en atención)
   iniciarActualizadorMinutos();
@@ -117,13 +118,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     )
     .subscribe();
 
-  // Recarga automática cada 15 segundos
-  setInterval(() => {
-    try {
-      location.reload();
-    } catch (_) {}
-  }, 15000);
-});
+  });
 
 // Función para inicializar el toggle de tema oscuro/claro
 function initThemeToggle() {
@@ -207,6 +202,9 @@ function esDiaOperativo(date = new Date()) {
 async function tomarTurno(event) {
   event.preventDefault();
   console.log("tomarTurno llamada");
+
+  // Asegurar configuración al día (incluye dias_operacion)
+  await cargarHoraLimite();
 
   // Validar día operacional
   if (!esDiaOperativo(new Date())) {
