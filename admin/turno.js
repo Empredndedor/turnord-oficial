@@ -55,7 +55,7 @@ async function cargarHoraLimite() {
       if (data.hora_apertura) HORA_APERTURA = data.hora_apertura;
       if (data.hora_cierre) HORA_LIMITE_TURNOS = data.hora_cierre;
       if (typeof data.limite_turnos === 'number') LIMITE_TURNOS = data.limite_turnos;
-      if (Array.isArray(data.dias_operacion)) ALLOWED_DAYS = data.dias_operacion;
+      if (Array.isArray(data.dias_operacion)) ALLOWED_DAYS = data.dias_operacion.map(n => Number(n)).filter(n => !Number.isNaN(n));
     }
   } catch (e) {
     console.warn('No se pudo cargar horario, usando valores por defecto.', e);
@@ -200,7 +200,8 @@ function getDiaOperacionIndex(date = new Date()) {
 }
 function esDiaOperativo(date = new Date()) {
   const idx = getDiaOperacionIndex(date);
-  return Array.isArray(ALLOWED_DAYS) ? ALLOWED_DAYS.includes(idx) : true;
+  if (!Array.isArray(ALLOWED_DAYS) || ALLOWED_DAYS.length === 0) return true;
+  return ALLOWED_DAYS.includes(idx);
 }
 
 // Tomar turno manual desde el modal
