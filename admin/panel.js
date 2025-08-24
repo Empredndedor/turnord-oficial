@@ -89,38 +89,40 @@ async function cargarDatos() {
 async function limpiarHistorialTurnos() {
   if (!confirm('¿Estás seguro que quieres limpiar el historial del día?')) return;
 
+  const btn = document.getElementById('btnLimpiarHistorial');
+  const tabla = document.getElementById('tablaHistorial');
+  const e1 = document.getElementById('turnosEspera');
+  const e2 = document.getElementById('turnosAtendidos');
+  const e3 = document.getElementById('turnosDia');
+
   try {
+    btn && (btn.disabled = true, btn.textContent = 'Limpiando...');
     const hoy = ymdLocal(new Date());
 
-    // Obtener ids de turnos del día para borrar
-    const { data, error: fetchError } = await supabase
-      .from('turnos')
-      .select('id')
-      .eq('negocio_id', negocioId)
-      .eq('fecha', hoy);
-
-    if (fetchError) throw fetchError;
-
-    const idsAEliminar = (data || []).map(t => t.id);
-
-    if (idsAEliminar.length === 0) {
-      alert('No hay turnos para eliminar hoy.');
-      return;
-    }
-
-    // Eliminar turnos
+    // Borrar directamente por negocio y fecha actual
     const { error: deleteError } = await supabase
       .from('turnos')
       .delete()
-      .in('id', idsAEliminar);
+      .eq('negocio_id', negocioId)
+      .eq('fecha', hoy);
 
     if (deleteError) throw deleteError;
 
+    // Limpiar UI inmediata
+    if (tabla) tabla.innerHTML = `<tr><td colspan="4" class="py-4 text-center text-gray-500">No hay turnos registrados hoy.</td></tr>`;
+    if (e1) e1.textContent = '0';
+    if (e2) e2.textContent = '0';
+    if (e3) e3.textContent = '0';
+
     alert('✅ Historial limpiado con éxito');
-    cargarDatos();
+
+    // Refrescar de la fuente para confirmar estado
+    await cargarDatos();
   } catch (error) {
     console.error('Error al limpiar historial:', error);
-    alert('❌ Error al limpiar historial: ' + error.message);
+    alert('❌ Error al limpiar historial: ' + (error?.message || error));
+  } finally {
+    btn && (btn.disabled = false, btn.textContent = 'Limpiar historial');
   }
 }
 

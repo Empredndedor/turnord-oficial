@@ -351,21 +351,45 @@ async function mostrarMensajeConfirmacion(turnoData) {
 
 // === Actualizar turno actual y conteo ===
 async function actualizarTurnoActualYConteo() {
-  const { data: turnoActualData } = await supabase
+  const hoy = new Date().toISOString().slice(0, 10);
+
+  // Prioridad: turno en atención del día actual
+  const { data: enAtencion } = await supabase
     .from('turnos')
     .select('turno')
     .eq('negocio_id', negocioId)
-    .eq('estado', 'En espera')
-    .order('created_at', { ascending: true })
+    .eq('fecha', hoy)
+    .eq('estado', 'En atención')
+    .order('started_at', { ascending: true })
     .limit(1);
 
+  let turnoActualTexto = null;
+  if (enAtencion && enAtencion.length) {
+    turnoActualTexto = enAtencion[0].turno;
+  } else {
+    // Si no hay en atención, tomar el primero en espera del día actual
+    const { data: enEspera } = await supabase
+      .from('turnos')
+      .select('turno')
+      .eq('negocio_id', negocioId)
+      .eq('fecha', hoy)
+      .eq('estado', 'En espera')
+      .order('created_at', { ascending: true })
+      .limit(1);
+    turnoActualTexto = enEspera && enEspera.length ? enEspera[0].turno : null;
+  }
+
+  // Conteo de turnos en espera del día actual
   const { count } = await supabase
     .from('turnos')
     .select('*', { count: 'exact', head: true })
     .eq('negocio_id', negocioId)
+    .eq('fecha', hoy)
     .eq('estado', 'En espera');
 
-  document.getElementById('turno-actual').textContent = turnoActualData?.[0]?.turno || 'A00';
+  // Fallback: letra del día + 00 (misma lógica que admin)
+  const letraHoy = obtenerLetraDelDia();
+  document.getElementById('turno-actual').textContent = turnoActualTexto || `${letraHoy}00`;
   document.getElementById('conteo-turno').textContent = count || '0';
 }
 
