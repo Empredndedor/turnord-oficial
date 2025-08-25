@@ -315,7 +315,7 @@ async function cargarConfiguracion() {
       .from('configuracion_negocio')
       .select('*')
       .eq('negocio_id', negocioId)
-      .single();
+      .maybeSingle();
 
     if (error) throw error;
 
@@ -327,7 +327,22 @@ async function cargarConfiguracion() {
       
       // Configurar días de operación si existen
       if (data.dias_operacion && Array.isArray(data.dias_operacion)) {
-        const selectedDays = data.dias_operacion.map(n => Number(n)).filter(n => !Number.isNaN(n));
+        // Mapear nombres -> números según UI (0=Domingo,1=Lunes,...,6=Sábado)
+        const dayNameToNum = {
+          'Domingo': 0,
+          'Lunes': 1,
+          'Martes': 2,
+          'Miércoles': 3,
+          'Miercoles': 3, // tolerar sin tilde
+          'Jueves': 4,
+          'Viernes': 5,
+          'Sábado': 6,
+          'Sabado': 6 // tolerar sin tilde
+        };
+        const selectedDays = data.dias_operacion
+          .map(name => dayNameToNum[name])
+          .filter(n => typeof n === 'number' && !Number.isNaN(n));
+
         const dayButtons = document.querySelectorAll('.day-btn');
         dayButtons.forEach(button => {
           const day = parseInt(button.getAttribute('data-day'));
@@ -356,13 +371,18 @@ async function guardarConfiguracion(event) {
   try {
     const horaApertura = document.getElementById('hora-apertura').value;
     const horaCierre = document.getElementById('hora-cierre').value;
-    const limiteTurnos = parseInt(document.getElementById('limite-turnos').value);
+    const limiteTurnosRaw = parseInt(document.getElementById('limite-turnos').value);
+    const limiteTurnos = Number.isNaN(limiteTurnosRaw) ? null : limiteTurnosRaw;
     
-    // Obtener días seleccionados
+    // Obtener días seleccionados (UI usa números) y mapearlos a nombres (text[] en DB)
+    const dayNumToName = { 0: 'Domingo', 1: 'Lunes', 2: 'Martes', 3: 'Miércoles', 4: 'Jueves', 5: 'Viernes', 6: 'Sábado' };
     const diasOperacion = [];
     document.querySelectorAll('.day-btn').forEach(button => {
       if (button.classList.contains('bg-blue-500')) {
-        diasOperacion.push(parseInt(button.getAttribute('data-day')));
+        const dn = parseInt(button.getAttribute('data-day'));
+        if (!Number.isNaN(dn) && dayNumToName[dn]) {
+          diasOperacion.push(dayNumToName[dn]);
+        }
       }
     });
     
@@ -370,10 +390,10 @@ async function guardarConfiguracion(event) {
       .from('configuracion_negocio')
       .upsert({
         negocio_id: negocioId,
-        hora_apertura: horaApertura,
-        hora_cierre: horaCierre,
+        hora_apertura: horaApertura || null,
+        hora_cierre: horaCierre || null,
         limite_turnos: limiteTurnos,
-        dias_operacion: diasOperacion
+        dias_operacion: diasOperacion.length ? diasOperacion : null
       }, { onConflict: 'negocio_id' });
 
     if (error) throw error;

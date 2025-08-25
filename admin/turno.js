@@ -17,7 +17,7 @@ function refrescarUI() {
     __refreshTimer = null;
     await cargarTurnos();
     await cargarEstadisticas();
-  }, 100);
+  }, 300);
 }
 
 // Cache de servicios (nombre -> duracion_min)
@@ -754,8 +754,16 @@ async function cargarEstadisticas() {
 }
 
 // Suscripción en tiempo real a cambios en turnos
+let canalTurnos = null;
+
 function suscribirseTurnos() {
-  supabase
+  // Desconectar canal existente si existe
+  if (canalTurnos) {
+    supabase.removeChannel(canalTurnos);
+  }
+  
+  // Crear nueva suscripción
+  canalTurnos = supabase
     .channel('turnos-admin')
     .on(
       'postgres_changes',
