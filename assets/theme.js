@@ -30,8 +30,8 @@
       styleEl = document.createElement('style');
       styleEl.id = 'theme-vars';
       styleEl.textContent = css;
-      // Insertar al principio del head si existe, o en documentElement como fallback
-      (document.head || document.documentElement).insertBefore(styleEl, (document.head || document.documentElement).firstChild);
+      // Insertar al final del head para que tenga prioridad sobre Tailwind
+      (document.head || document.documentElement).appendChild(styleEl);
     }
   } catch (e) {
     // Si algo falla, intentar un append simple

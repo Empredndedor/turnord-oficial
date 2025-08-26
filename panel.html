@@ -48,13 +48,13 @@
 
   <!-- Sidebar -->
   <div class="flex min-h-screen">
-    <aside class="w-64 bg-blue-900 dark:bg-blue-950 text-white p-6 hidden md:block">
+    <aside class="w-64 bg-primary-700 dark:bg-primary-700 text-white p-6 hidden md:block">
       <h2 class="text-2xl font-bold mb-8">TurnoRD Admin</h2>
       <nav class="space-y-4">
-        <a href="panel.html" class="block hover:text-blue-300 rounded px-3 py-2">Inicio</a>
-        <a href="turno.html" class="block bg-white text-blue-900 font-semibold rounded px-3 py-2 shadow">Turnos</a>
-        <a href="negocio.html" class="block hover:text-blue-300 rounded px-3 py-2">Mi negocio</a>
-        <a href="configuracion.html" class="block hover:text-blue-300 rounded px-3 py-2">Configuración</a>
+        <a href="panel.html" class="block hover:text-white rounded px-3 py-2">Inicio</a>
+        <a href="turno.html" class="block bg-white text-gray-900 font-semibold rounded px-3 py-2 shadow">Turnos</a>
+        <a href="negocio.html" class="block hover:text-white rounded px-3 py-2">Mi negocio</a>
+        <a href="configuracion.html" class="block hover:text-white rounded px-3 py-2">Configuración</a>
         <a href="cierre.html" id="cerrarSesion" class="block hover:text-red-400 mt-6 rounded px-3 py-2">Cerrar sesión</a>
       </nav>
     </aside>
@@ -130,23 +130,21 @@
   // Esto busca todos los enlaces del sidebar y resalta el que coincide con la URL
   document.querySelectorAll('aside nav a').forEach(link => {
     if (window.location.pathname.endsWith(link.getAttribute('href'))) {
-      link.classList.add('bg-white', 'text-blue-900', 'font-semibold', 'shadow');
+      link.classList.add('bg-white', 'text-gray-900', 'font-semibold', 'shadow');
     } else {
-      link.classList.remove('bg-white', 'text-blue-900', 'font-semibold', 'shadow');
+      link.classList.remove('bg-white', 'text-gray-900', 'font-semibold', 'shadow');
     }
   });
 </script>
 
-  <footer class="bg-blue-900 dark:bg-blue-950 text-white text-center text-sm py-4 mt-12 rounded-t-xl">
+  <footer class="bg-primary-700 dark:bg-primary-700 text-white text-center text-sm py-4 mt-12 rounded-t-xl">
   © 2025 TurnoRD Todo los derechos reservado • Hecho por <strong>LUIS ALFREDO CABRERA REYES</strong>
 </footer>
 
 <script>
-  // Función para alternar modo oscuro
+  // Función para alternar modo oscuro con theme.js
   document.getElementById('toggleDarkMode').addEventListener('click', function() {
-    const modoOscuro = !document.documentElement.classList.contains('dark');
-    document.documentElement.classList.toggle('dark', modoOscuro);
-    localStorage.setItem('modoOscuro', modoOscuro);
+    if (window.theme && window.theme.toggleMode) window.theme.toggleMode();
   });
 </script>
 
