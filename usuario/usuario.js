@@ -1,16 +1,19 @@
 // usuario.js
 import { supabase } from '../database.js';
 
-
+// Identificador de negocio
 const negocioId = 'barberia0001';
+
+// Estado en memoria/localStorage
 let turnoAsignado = null;
 let intervaloContador = null;
 let telefonoUsuario = localStorage.getItem('telefonoUsuario') || null;
 
-let HORA_LIMITE_TURNOS = "23:00"; // valor por defecto
+// Cache de configuración
+let HORA_LIMITE_TURNOS = '23:00';
 let configCache = {
-  hora_apertura: "08:00",
-  hora_cierre: "23:00",
+  hora_apertura: '08:00',
+  hora_cierre: '23:00',
   limite_turnos: 50
 };
 
@@ -29,9 +32,12 @@ async function cargarServiciosActivos() {
       .eq('negocio_id', negocioId)
       .eq('activo', true)
       .order('nombre', { ascending: true });
+
     if (error) throw error;
+
     serviciosCache = {};
     (data || []).forEach(s => { serviciosCache[s.nombre] = s.duracion_min; });
+
     const sel = document.querySelector('select[name="tipo"]');
     if (sel) {
       sel.innerHTML = '<option value="">Seleccione un servicio</option>' +
@@ -42,73 +48,7 @@ async function cargarServiciosActivos() {
   }
 }
 
-async function tomarTurnoSimple(nombre, telefono, servicio) {
-  // Verificar si el negocio está en break
-  const estadoBreak = await verificarBreakNegocio();
-  if (estadoBreak.enBreak) {
-    mostrarNotificacionBreak(estadoBreak.mensaje, estadoBreak.tiempoRestante);
-    return;
-  }
-
-  // Usar configuración del cache actualizada en tiempo real
-  const horaCierre = configCache.hora_cierre;
-  const horaApertura = configCache.hora_apertura;
-  const limiteTurnos = configCache.limite_turnos;
-  
-  const ahora = new Date();
-  const [aperturaHora, aperturaMin] = horaApertura.split(':').map(Number);
-  const [cierreHora, cierreMin] = horaCierre.split(':').map(Number);
-
-  // Verificar horario de apertura
-  if (
-    ahora.getHours() < aperturaHora ||
-    (ahora.getHours() === aperturaHora && ahora.getMinutes() < aperturaMin)
-  ) {
-    alert(`Aún no hemos abierto. Horario de atención: ${horaApertura} - ${horaCierre}`);
-    return;
-  }
-
-  // Verificar horario de cierre
-  if (
-    ahora.getHours() > cierreHora ||
-    (ahora.getHours() === cierreHora && ahora.getMinutes() > cierreMin)
-  ) {
-    alert(`Ya hemos cerrado. Horario de atención: ${horaApertura} - ${horaCierre}`);
-    return;
-  }
-
-  // Verificar límite de turnos del día
-  const fechaHoy = new Date().toISOString().split('T')[0];
-  const turnosHoy = await contarTurnosDia(fechaHoy);
-  
-  if (turnosHoy >= limiteTurnos) {
-    alert(`Se ha alcanzado el límite de ${limiteTurnos} turnos para hoy.`);
-    return;
-  }
-
-  const { error } = await supabase.from('turnos').insert([
-    {
-      negocio_id: negocioId,
-      nombre,
-      telefono,
-      servicio,
-      estado: 'En espera',
-      fecha: fechaHoy,
-      hora: ahora.toLocaleTimeString(),
-    },
-  ]);
-
-  if (error) {
-    console.error('Error tomando turno:', error.message);
-    alert('Error al tomar el turno');
-  } else {
-    alert('Turno registrado correctamente');
-  }
-}
-
-
-
-// === Funciones auxiliares ===
+// Utilidades de fecha/hora
 function obtenerFechaActual() {
   const hoy = new Date();
   const anio = hoy.getFullYear();
@@ -125,39 +65,191 @@ function obtenerHoraActual() {
 }
 
 function cerrarModal() {
-  document.getElementById('modal').classList.add('hidden');
+  const modal = document.getElementById('modal');
+  if (modal) modal.classList.add('hidden');
 }
 window.cerrarModal = cerrarModal;
 
-// === Carga de configuración ===
-async function cargarHoraCierre() {
+// Conversión HH:MM a minutos totales
+function hhmmToMinutes(hhmm) {
+  const [h, m] = hhmm.split(':').map(Number);
+  return h * 60 + m;
+}
+
+// Obtiene config (apertura, cierre, límite)
+async function obtenerConfig() {
   const { data, error } = await supabase
     .from('configuracion_negocio')
-    .select('hora_cierre')
+    .select('hora_apertura, hora_cierre, limite_turnos')
     .eq('negocio_id', negocioId)
     .single();
 
-  if (!error && data && data.hora_cierre) {
-    HORA_LIMITE_TURNOS = data.hora_cierre;
+  if (error) throw new Error(error.message);
+
+  // Actualizar cache
+  if (data) {
+    configCache = { ...configCache, ...data };
+    HORA_LIMITE_TURNOS = data.hora_cierre || HORA_LIMITE_TURNOS;
+  }
+
+  return data;
+}
+
+// Actualiza la configuración y notifica
+async function actualizarConfiguracion() {
+  try {
+    const config = await obtenerConfig();
+    if (config) {
+      mostrarNotificacionConfiguracion(
+        'Configuración actualizada',
+        `Horarios: ${config.hora_apertura} - ${config.hora_cierre} | Límite: ${config.limite_turnos} turnos`
+      );
+      console.log('Configuración actualizada:', config);
+    }
+  } catch (error) {
+    console.error('Error al actualizar configuración:', error);
   }
 }
 
-// Función para obtener la letra del día basada en la fecha
+function mostrarNotificacionConfiguracion(titulo, mensaje) {
+  const notificacion = document.createElement('div');
+  notificacion.className = 'fixed top-4 right-4 bg-blue-500 text-white px-6 py-4 rounded-lg shadow-lg z-50 max-w-sm';
+  notificacion.innerHTML = `
+    <div class="flex items-start">
+      <div class="flex-shrink-0">
+        <svg class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      </div>
+      <div class="ml-3">
+        <p class="text-sm font-medium">${titulo}</p>
+        <p class="text-sm text-blue-100 mt-1">${mensaje}</p>
+      </div>
+      <button onclick="this.parentElement.parentElement.remove()" class="ml-4 text-blue-200 hover:text-white">
+        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+  `;
+
+  document.body.appendChild(notificacion);
+  setTimeout(() => { if (notificacion.parentElement) notificacion.remove(); }, 5000);
+}
+
+// Cuenta turnos de una fecha YYYY-MM-DD
+async function contarTurnosDia(fechaISO) {
+  const { count, error } = await supabase
+    .from('turnos')
+    .select('id', { count: 'exact', head: true })
+    .eq('negocio_id', negocioId)
+    .eq('fecha', fechaISO);
+
+  if (error) throw new Error(error.message);
+  return count || 0;
+}
+
+// ===== Verificación de break =====
+async function verificarBreakNegocio() {
+  try {
+    const { data, error } = await supabase
+      .from('estado_negocio')
+      .select('en_break, break_end_time, break_message')
+      .eq('negocio_id', negocioId)
+      .single();
+
+    if (error && error.code !== 'PGRST116') {
+      return { enBreak: false, mensaje: null };
+    }
+
+    if (data && data.en_break) {
+      const endTime = new Date(data.break_end_time);
+      const now = new Date();
+      if (endTime > now) {
+        return {
+          enBreak: true,
+          mensaje: data.break_message || 'Estamos en break, regresamos pronto...',
+          tiempoRestante: Math.ceil((endTime - now) / (1000 * 60))
+        };
+      }
+    }
+    return { enBreak: false, mensaje: null };
+  } catch (error) {
+    console.error('Error al verificar break:', error);
+    return { enBreak: false, mensaje: null };
+  }
+}
+
+function mostrarNotificacionBreak(mensaje, tiempoRestante) {
+  const notificacion = document.createElement('div');
+  notificacion.className = 'fixed top-4 right-4 bg-orange-500 text-white p-4 rounded-lg shadow-lg z-50 max-w-sm';
+  notificacion.innerHTML = `
+    <div class="flex items-start space-x-3">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+      <div>
+        <h4 class="font-semibold mb-1">Negocio en Break</h4>
+        <p class="text-sm mb-2">${mensaje}</p>
+        <p class="text-xs opacity-90">Tiempo estimado: ${tiempoRestante} minutos</p>
+      </div>
+      <button onclick="this.parentElement.parentElement.remove()" class="text-white hover:text-gray-200 ml-2">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+  `;
+
+  document.body.appendChild(notificacion);
+  setTimeout(() => { if (notificacion.parentElement) notificacion.remove(); }, 8000);
+}
+
+// ===== Días laborales =====
+async function verificarDiaLaboralFecha(fecha = new Date()) {
+  try {
+    const { data, error } = await supabase
+      .from('configuracion_negocio')
+      .select('dias_operacion')
+      .eq('negocio_id', negocioId)
+      .single();
+
+    if (error) {
+      console.warn('No se pudo verificar configuración de días laborales:', error);
+      return true; // Permitir por defecto si no hay configuración
+    }
+
+    if (!data || !Array.isArray(data.dias_operacion) || data.dias_operacion.length === 0) {
+      return false; // No hay días configurados
+    }
+
+    const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+    const dia = diasSemana[fecha.getDay()];
+    return data.dias_operacion.includes(dia);
+  } catch (error) {
+    console.error('Error al verificar día laboral:', error);
+    return true; // Permitir por defecto en caso de error
+  }
+}
+
+async function verificarDiaLaboral() {
+  return verificarDiaLaboralFecha(new Date());
+}
+
+// ===== Lógica de turnos =====
 function obtenerLetraDelDia() {
   const hoy = new Date();
   const fechaBase = new Date('2024-08-23'); // Fecha base donde A = día 0
   const diferenciaDias = Math.floor((hoy - fechaBase) / (1000 * 60 * 60 * 24));
-  const indiceDia = diferenciaDias % 26; // Ciclo de 26 letras (A-Z)
-  const letra = String.fromCharCode(65 + Math.abs(indiceDia)); // 65 = 'A'
+  const indiceDia = ((diferenciaDias % 26) + 26) % 26; // Asegurar positivo
+  const letra = String.fromCharCode(65 + indiceDia); // 65 = 'A'
   return letra;
 }
 
-// === Generar nuevo turno ===
 async function generarNuevoTurno() {
   const letraHoy = obtenerLetraDelDia();
   const fechaHoy = new Date().toISOString().slice(0, 10);
-  
-  // Buscar el último turno del día actual con la letra correspondiente
+
   const { data, error } = await supabase
     .from('turnos')
     .select('turno')
@@ -169,12 +261,11 @@ async function generarNuevoTurno() {
 
   if (error || !data || data.length === 0) return `${letraHoy}01`;
 
-  const ultimo = data[0].turno;
-  const numero = parseInt(ultimo.substring(1)) + 1;
-  return `${letraHoy}${numero.toString().padStart(2, '0')}`;
+  const ultimo = data[0].turno || `${letraHoy}00`;
+  const numero = parseInt(ultimo.substring(1), 10) + 1;
+  return `${letraHoy}${String(numero).padStart(2, '0')}`;
 }
 
-// === Verificar si el usuario ya tiene un turno activo ===
 async function verificarTurnoActivo() {
   telefonoUsuario = localStorage.getItem('telefonoUsuario');
   if (!telefonoUsuario) return false;
@@ -199,7 +290,6 @@ async function verificarTurnoActivo() {
   return true;
 }
 
-// === Obtener posición en la fila ===
 async function obtenerPosicionEnFila(turnoUsuario) {
   const { data, error } = await supabase
     .from('turnos')
@@ -234,7 +324,7 @@ async function calcularTiempoEstimadoTotal(turnoObjetivo = null) {
       const servicio = enAtencion[0].servicio;
       const duracionTotal = serviciosCache[servicio] || 25;
       const inicio = enAtencion[0].started_at ? new Date(enAtencion[0].started_at) : null;
-      
+
       if (inicio) {
         const transcurrido = Math.floor((Date.now() - inicio.getTime()) / 60000);
         tiempoTotal = Math.max(duracionTotal - transcurrido, 0);
@@ -257,13 +347,9 @@ async function calcularTiempoEstimadoTotal(turnoObjetivo = null) {
       .order('created_at', { ascending: true });
 
     if (cola && cola.length) {
-      // Si se especifica un turno objetivo, solo sumar hasta ese turno
-      const limite = turnoObjetivo ? 
-        cola.findIndex(t => t.turno === turnoObjetivo) : 
-        cola.length;
-      
+      const limite = turnoObjetivo ? cola.findIndex(t => t.turno === turnoObjetivo) : cola.length;
       const turnosASumar = limite === -1 ? cola : cola.slice(0, limite);
-      
+
       for (const turno of turnosASumar) {
         const duracionServicio = serviciosCache[turno.servicio] || 25;
         tiempoTotal += duracionServicio;
@@ -276,18 +362,18 @@ async function calcularTiempoEstimadoTotal(turnoObjetivo = null) {
   return tiempoTotal;
 }
 
-// === Mostrar mensaje de confirmación con contador ===
 async function mostrarMensajeConfirmacion(turnoData) {
   const deadlineKey = getDeadlineKey(turnoData.turno);
   let deadline = Number(localStorage.getItem(deadlineKey) || 0);
   if (!deadline || Number.isNaN(deadline) || deadline <= Date.now()) {
-    // Usar el nuevo cálculo de tiempo estimado mejorado
     const minutosEspera = await calcularTiempoEstimadoTotal(turnoData.turno);
     deadline = Date.now() + (minutosEspera * 60 * 1000);
     localStorage.setItem(deadlineKey, String(deadline));
   }
 
   const mensajeContenedor = document.getElementById('mensaje-turno');
+  if (!mensajeContenedor) return;
+
   mensajeContenedor.innerHTML = `
     <div class="bg-green-100 text-green-700 rounded-xl p-4 shadow mt-4 text-sm">
       ✅ Hola <strong>${turnoData.nombre}</strong>, tu turno es <strong>${turnoData.turno}</strong>.<br>
@@ -306,10 +392,10 @@ async function mostrarMensajeConfirmacion(turnoData) {
     const segundosPos = Math.max(0, restante);
     const minutos = Math.floor(segundosPos / 60);
     const segundos = segundosPos % 60;
-    tiempoSpan.textContent = `${minutos} min ${segundos < 10 ? '0' : ''}${segundos} seg`;
+    if (tiempoSpan) tiempoSpan.textContent = `${minutos} min ${segundos < 10 ? '0' : ''}${segundos} seg`;
 
     if (restante <= 0) {
-      tiempoSpan.textContent = `🎉 Prepárate, tu turno está muy cerca.`;
+      if (tiempoSpan) tiempoSpan.textContent = '🎉 Prepárate, tu turno está muy cerca.';
       clearInterval(intervaloContador);
     }
   }
@@ -318,38 +404,43 @@ async function mostrarMensajeConfirmacion(turnoData) {
   intervaloContador = setInterval(actualizarContador, 1000);
 
   // Cancelar turno
-  document.getElementById('cancelarTurno').addEventListener('click', async () => {
-    const confirmacion = confirm('¿Deseas cancelar tu turno?');
-    if (!confirmacion) return;
+  const cancelarBtn = document.getElementById('cancelarTurno');
+  if (cancelarBtn) {
+    cancelarBtn.addEventListener('click', async () => {
+      const confirmacion = confirm('¿Deseas cancelar tu turno?');
+      if (!confirmacion) return;
 
-    const { error } = await supabase
-      .from('turnos')
-      .delete()
-      .eq('turno', turnoData.turno)
-      .eq('negocio_id', negocioId)
-      .eq('telefono', telefonoUsuario);
+      const { error } = await supabase
+        .from('turnos')
+        .delete()
+        .eq('turno', turnoData.turno)
+        .eq('negocio_id', negocioId)
+        .eq('telefono', telefonoUsuario);
 
-    if (error) {
-      alert('Error al cancelar el turno: ' + error.message);
-      return;
-    }
+      if (error) {
+        alert('Error al cancelar el turno: ' + error.message);
+        return;
+      }
 
-    mensajeContenedor.innerHTML = `
-      <div class="bg-red-100 text-red-700 rounded-xl p-4 shadow mt-4 text-sm">
-        ❌ Has cancelado tu turno <strong>${turnoData.turno}</strong>.
-      </div>
-    `;
-    document.querySelector('button[onclick*="modal"]').disabled = false;
-    turnoAsignado = null;
-    clearInterval(intervaloContador);
-    localStorage.removeItem(deadlineKey);
-    localStorage.removeItem('telefonoUsuario');
-    telefonoUsuario = null;
-    await actualizarTurnoActualYConteo();
-  });
+      mensajeContenedor.innerHTML = `
+        <div class="bg-red-100 text-red-700 rounded-xl p-4 shadow mt-4 text-sm">
+          ❌ Has cancelado tu turno <strong>${turnoData.turno}</strong>.
+        </div>
+      `;
+
+      const btnTomarTurno = document.querySelector('button[onclick*="modal"]');
+      if (btnTomarTurno) btnTomarTurno.disabled = false;
+
+      turnoAsignado = null;
+      clearInterval(intervaloContador);
+      localStorage.removeItem(deadlineKey);
+      localStorage.removeItem('telefonoUsuario');
+      telefonoUsuario = null;
+      await actualizarTurnoActualYConteo();
+    });
+  }
 }
 
-// === Actualizar turno actual y conteo ===
 async function actualizarTurnoActualYConteo() {
   const hoy = new Date().toISOString().slice(0, 10);
 
@@ -367,7 +458,6 @@ async function actualizarTurnoActualYConteo() {
   if (enAtencion && enAtencion.length) {
     turnoActualTexto = enAtencion[0].turno;
   } else {
-    // Si no hay en atención, tomar el primero en espera del día actual
     const { data: enEspera } = await supabase
       .from('turnos')
       .select('turno')
@@ -379,7 +469,6 @@ async function actualizarTurnoActualYConteo() {
     turnoActualTexto = enEspera && enEspera.length ? enEspera[0].turno : null;
   }
 
-  // Conteo de turnos en espera del día actual
   const { count } = await supabase
     .from('turnos')
     .select('*', { count: 'exact', head: true })
@@ -387,19 +476,108 @@ async function actualizarTurnoActualYConteo() {
     .eq('fecha', hoy)
     .eq('estado', 'En espera');
 
-  // Fallback: letra del día + 00 (misma lógica que admin)
   const letraHoy = obtenerLetraDelDia();
-  document.getElementById('turno-actual').textContent = turnoActualTexto || `${letraHoy}00`;
-  document.getElementById('conteo-turno').textContent = count || '0';
+  const turnoActualEl = document.getElementById('turno-actual');
+  if (turnoActualEl) turnoActualEl.textContent = turnoActualTexto || `${letraHoy}00`;
+  const conteoEl = document.getElementById('conteo-turno');
+  if (conteoEl) conteoEl.textContent = (count || 0).toString();
 }
 
-// === Inicialización al cargar la página ===
+// Toma de turno desde formulario simple (hoy/ahora)
+async function tomarTurnoSimple(nombre, telefono, servicio) {
+  // Validar día laboral
+  const esDiaLaboral = await verificarDiaLaboral();
+  if (!esDiaLaboral) {
+    alert('Hoy no es un día laboral. No se pueden tomar turnos en este día.');
+    return;
+  }
+
+  // Verificar si el negocio está en break
+  const estadoBreak = await verificarBreakNegocio();
+  if (estadoBreak.enBreak) {
+    mostrarNotificacionBreak(estadoBreak.mensaje, estadoBreak.tiempoRestante);
+    return;
+  }
+
+  // Usar configuración del cache actualizada en tiempo real
+  const ahora = new Date();
+  const horaActual = `${String(ahora.getHours()).padStart(2, '0')}:${String(ahora.getMinutes()).padStart(2, '0')}`;
+  const apertura = configCache.hora_apertura;
+  const cierre = configCache.hora_cierre;
+
+  if (horaActual < apertura) {
+    alert(`Aún no hemos abierto. Horario de atención: ${apertura} - ${cierre}`);
+    return;
+  }
+  if (horaActual > cierre) {
+    alert('Ya no se pueden tomar turnos a esta hora. Intenta mañana.');
+    return;
+  }
+
+  // Verificar límite de turnos del día
+  const fechaHoy = obtenerFechaActual();
+  const turnosHoy = await contarTurnosDia(fechaHoy);
+  if (turnosHoy >= configCache.limite_turnos) {
+    alert(`Se ha alcanzado el límite de ${configCache.limite_turnos} turnos para hoy.`);
+    return;
+  }
+
+  // Verificar si ya tiene turno activo por teléfono
+  telefonoUsuario = telefono;
+  localStorage.setItem('telefonoUsuario', telefonoUsuario);
+
+  const { data: turnosActivos } = await supabase
+    .from('turnos')
+    .select('*')
+    .eq('negocio_id', negocioId)
+    .eq('estado', 'En espera')
+    .eq('telefono', telefonoUsuario);
+
+  if (turnosActivos && turnosActivos.length > 0) {
+    alert('Ya tienes un turno activo.');
+    return;
+  }
+
+  // Generar nuevo turno y registrar
+  const nuevoTurno = await generarNuevoTurno();
+  const fecha = fechaHoy;
+  const hora = obtenerHoraActual();
+
+  const { error } = await supabase.from('turnos').insert([
+    {
+      negocio_id: negocioId,
+      turno: nuevoTurno,
+      nombre,
+      telefono,
+      servicio,
+      estado: 'En espera',
+      fecha,
+      hora,
+    },
+  ]);
+
+  if (error) {
+    alert('Error al registrar turno: ' + error.message);
+    return;
+  }
+
+  turnoAsignado = nuevoTurno;
+  await mostrarMensajeConfirmacion({ nombre, turno: nuevoTurno });
+  const form = document.getElementById('formRegistroNegocio');
+  if (form) form.reset();
+  cerrarModal();
+
+  const btnTomarTurno = document.querySelector('button[onclick*="modal"]');
+  if (btnTomarTurno) btnTomarTurno.disabled = true;
+
+  await actualizarTurnoActualYConteo();
+}
+
+// ===== Inicialización =====
 window.addEventListener('DOMContentLoaded', async () => {
-  // Cargar configuración inicial en el cache
+  // Cargar configuración inicial y servicios
   await actualizarConfiguracion();
-  
   await cargarServiciosActivos();
-  await cargarHoraCierre();
 
   const fechaElem = document.getElementById('fecha-de-hoy');
   const btnTomarTurno = document.querySelector('button[onclick*="modal"]');
@@ -407,126 +585,86 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   // Estado de break inicial
   const estadoBreakInicial = await verificarBreakNegocio();
-  if (estadoBreakInicial.enBreak) {
-    btnTomarTurno.disabled = true;
-    btnTomarTurno.classList.add('opacity-50','cursor-not-allowed');
-    mostrarNotificacionBreak(estadoBreakInicial.mensaje, estadoBreakInicial.tiempoRestante);
-  } else {
-    btnTomarTurno.disabled = false;
-    btnTomarTurno.classList.remove('opacity-50','cursor-not-allowed');
+  if (btnTomarTurno) {
+    if (estadoBreakInicial.enBreak) {
+      btnTomarTurno.disabled = true;
+      btnTomarTurno.classList.add('opacity-50', 'cursor-not-allowed');
+      mostrarNotificacionBreak(estadoBreakInicial.mensaje, estadoBreakInicial.tiempoRestante);
+    } else {
+      btnTomarTurno.disabled = false;
+      btnTomarTurno.classList.remove('opacity-50', 'cursor-not-allowed');
+    }
   }
 
-  // Mostrar fecha
-  const fechaTexto = new Date().toLocaleDateString('es-DO', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
-  const letraHoy = obtenerLetraDelDia();
-  fechaElem.innerHTML = `${fechaTexto} <span class="text-blue-600 dark:text-blue-400 font-bold">(Turnos serie ${letraHoy})</span>`;
+  // Mostrar fecha del día + letra de serie
+  if (fechaElem) {
+    const fechaTexto = new Date().toLocaleDateString('es-DO', {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+    });
+    const letraHoy = obtenerLetraDelDia();
+    fechaElem.innerHTML = `${fechaTexto} <span class="text-blue-600 dark:text-blue-400 font-bold">(Turnos serie ${letraHoy})</span>`;
+  }
 
   // Validaciones en tiempo real
-  document.getElementById('telefono').addEventListener('input', function () {
-    this.value = this.value.replace(/[^0-9]/g, '');
-  });
-  document.getElementById('nombre').addEventListener('input', function () {
-    this.value = this.value.replace(/[^A-Za-zÁÉÍÓÚáéíóúÑñ ]/g, '');
-  });
+  const telInput = document.getElementById('telefono');
+  if (telInput) {
+    telInput.addEventListener('input', function () {
+      this.value = this.value.replace(/[^0-9]/g, '');
+    });
+  }
+  const nombreInput = document.getElementById('nombre');
+  if (nombreInput) {
+    nombreInput.addEventListener('input', function () {
+      this.value = this.value.replace(/[^A-Za-zÁÉÍÓÚáéíóúÑñ ]/g, '');
+    });
+  }
 
   // Verificar si ya tiene turno
   if (await verificarTurnoActivo()) {
-    btnTomarTurno.disabled = true;
+    if (btnTomarTurno) btnTomarTurno.disabled = true;
   }
 
   await actualizarTurnoActualYConteo();
 
-  // Registro de nuevo turno
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
+  // Registro de nuevo turno por formulario
+  if (form) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
 
-    // Verificar si el negocio está en break
-    const estadoBreak = await verificarBreakNegocio();
-    if (estadoBreak.enBreak) {
-      mostrarNotificacionBreak(estadoBreak.mensaje, estadoBreak.tiempoRestante);
-      return;
-    }
+      // Validar día laboral
+      const esDiaLaboral = await verificarDiaLaboral();
+      if (!esDiaLaboral) {
+        alert('Hoy no es un día laboral. No se pueden tomar turnos en este día.');
+        return;
+      }
 
-    const ahora = new Date();
-    const horaActual = ahora.toTimeString().slice(0, 5);
-    const apertura = configCache.hora_apertura;
-    const cierre = configCache.hora_cierre;
-    if (horaActual < apertura) {
-      alert(`Aún no hemos abierto. Horario de atención: ${apertura} - ${cierre}`);
-      return;
-    }
-    if (horaActual >= cierre) {
-      alert('Ya no se pueden tomar turnos a esta hora. Intenta mañana.');
-      return;
-    }
+      // Verificar si el negocio está en break
+      const estadoBreak = await verificarBreakNegocio();
+      if (estadoBreak.enBreak) {
+        mostrarNotificacionBreak(estadoBreak.mensaje, estadoBreak.tiempoRestante);
+        return;
+      }
 
-    const nombre = document.getElementById('nombre').value.trim();
-    const telefono = document.getElementById('telefono').value.trim();
-    const servicio = form.tipo.value;
+      const nombre = nombreInput ? nombreInput.value.trim() : '';
+      const telefono = telInput ? telInput.value.trim() : '';
+      const servicio = form.tipo ? form.tipo.value : '';
 
-    telefonoUsuario = telefono;
-    localStorage.setItem('telefonoUsuario', telefono);
+      if (!nombre || !telefono || !servicio) {
+        alert('Por favor complete nombre, teléfono y servicio.');
+        return;
+      }
 
-    const { data: turnosActivos } = await supabase
-      .from('turnos')
-      .select('*')
-      .eq('negocio_id', negocioId)
-      .eq('estado', 'En espera')
-      .eq('telefono', telefonoUsuario);
+      await tomarTurnoSimple(nombre, telefono, servicio);
+    });
+  }
 
-    if (turnosActivos && turnosActivos.length > 0) {
-      alert('Ya tienes un turno activo.');
-      return;
-    }
-
-    const nuevoTurno = await generarNuevoTurno();
-    const fecha = obtenerFechaActual();
-    const hora = obtenerHoraActual();
-
-    const { error } = await supabase.from('turnos').insert([
-      {
-        negocio_id: negocioId,
-        turno: nuevoTurno,
-        nombre,
-        telefono,
-        servicio,
-        estado: 'En espera',
-        fecha,
-        hora,
-      },
-    ]);
-
-    if (error) {
-      alert('Error al registrar turno: ' + error.message);
-      return;
-    }
-
-    turnoAsignado = nuevoTurno;
-    await mostrarMensajeConfirmacion({ nombre, turno: nuevoTurno });
-    form.reset();
-    cerrarModal();
-    btnTomarTurno.disabled = true;
-
-    await actualizarTurnoActualYConteo();
-  });
-
-  // Suscripción en tiempo real
+  // Suscripción en tiempo real de turnos
   supabase
     .channel('turnos-usuario')
     .on(
       'postgres_changes',
-      {
-        event: '*',
-        schema: 'public',
-        table: 'turnos',
-        filter: `negocio_id=eq.${negocioId}`,
-      },
-      async (payload) => {
+      { event: '*', schema: 'public', table: 'turnos', filter: `negocio_id=eq.${negocioId}` },
+      async () => {
         telefonoUsuario = localStorage.getItem('telefonoUsuario');
         if (telefonoUsuario) {
           const { data, error } = await supabase
@@ -539,13 +677,16 @@ window.addEventListener('DOMContentLoaded', async () => {
             .single();
 
           if (!error && data && data.estado !== 'En espera') {
-            document.getElementById('mensaje-turno').innerHTML = `
-              <div class="bg-blue-100 text-blue-700 rounded-xl p-4 shadow mt-4 text-sm">
-                ✅ Tu turno <strong>${data.turno}</strong> ha sido ${data.estado.toLowerCase()}.
-              </div>
-            `;
+            const cont = document.getElementById('mensaje-turno');
+            if (cont) {
+              cont.innerHTML = `
+                <div class="bg-blue-100 text-blue-700 rounded-xl p-4 shadow mt-4 text-sm">
+                  ✅ Tu turno <strong>${data.turno}</strong> ha sido ${data.estado.toLowerCase()}.
+                </div>
+              `;
+            }
             turnoAsignado = null;
-            btnTomarTurno.disabled = false;
+            if (btnTomarTurno) btnTomarTurno.disabled = false;
             if (intervaloContador) clearInterval(intervaloContador);
             localStorage.removeItem(getDeadlineKey(data.turno));
             localStorage.removeItem('telefonoUsuario');
@@ -562,21 +703,18 @@ window.addEventListener('DOMContentLoaded', async () => {
     .channel('estado-negocio-usuario')
     .on(
       'postgres_changes',
-      {
-        event: '*',
-        schema: 'public',
-        table: 'estado_negocio',
-        filter: `negocio_id=eq.${negocioId}`,
-      },
+      { event: '*', schema: 'public', table: 'estado_negocio', filter: `negocio_id=eq.${negocioId}` },
       async () => {
         const estado = await verificarBreakNegocio();
-        if (estado.enBreak) {
-          btnTomarTurno.disabled = true;
-          btnTomarTurno.classList.add('opacity-50','cursor-not-allowed');
-          mostrarNotificacionBreak(estado.mensaje, estado.tiempoRestante);
-        } else {
-          btnTomarTurno.disabled = false;
-          btnTomarTurno.classList.remove('opacity-50','cursor-not-allowed');
+        if (btnTomarTurno) {
+          if (estado.enBreak) {
+            btnTomarTurno.disabled = true;
+            btnTomarTurno.classList.add('opacity-50', 'cursor-not-allowed');
+            mostrarNotificacionBreak(estado.mensaje, estado.tiempoRestante);
+          } else {
+            btnTomarTurno.disabled = false;
+            btnTomarTurno.classList.remove('opacity-50', 'cursor-not-allowed');
+          }
         }
       }
     )
@@ -587,12 +725,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     .channel('configuracion-negocio-usuario')
     .on(
       'postgres_changes',
-      {
-        event: '*',
-        schema: 'public',
-        table: 'configuracion_negocio',
-        filter: `negocio_id=eq.${negocioId}`,
-      },
+      { event: '*', schema: 'public', table: 'configuracion_negocio', filter: `negocio_id=eq.${negocioId}` },
       async () => {
         await actualizarConfiguracion();
       }
@@ -600,187 +733,28 @@ window.addEventListener('DOMContentLoaded', async () => {
     .subscribe();
 });
 
-
-
-
-// usuario.js
-
-
-// Ayuda: compara "HH:MM" (24h)
-function hhmmToMinutes(hhmm) {
-  const [h, m] = hhmm.split(':').map(Number);
-  return h * 60 + m;
-}
-
-// Obtiene config (apertura, cierre, límite)
-async function obtenerConfig() {
-  const { data, error } = await supabase
-    .from('configuracion_negocio')
-    .select('hora_apertura, hora_cierre, limite_turnos')
-    .eq('negocio_id', negocioId)
-    .single();
-
-  if (error) throw new Error(error.message);
-  
-  // Actualizar cache
-  if (data) {
-    configCache = { ...data };
-    HORA_LIMITE_TURNOS = data.hora_cierre;
-  }
-  
-  return data;
-}
-
-// Función para actualizar configuración en tiempo real
-async function actualizarConfiguracion() {
-  try {
-    const config = await obtenerConfig();
-    
-    // Mostrar notificación de cambio
-    mostrarNotificacionConfiguracion(
-      'Configuración actualizada',
-      `Horarios: ${config.hora_apertura} - ${config.hora_cierre} | Límite: ${config.limite_turnos} turnos`
-    );
-    
-    console.log('Configuración actualizada:', config);
-  } catch (error) {
-    console.error('Error al actualizar configuración:', error);
-  }
-}
-
-// Función para mostrar notificaciones de configuración
-function mostrarNotificacionConfiguracion(titulo, mensaje) {
-  const notificacion = document.createElement('div');
-  notificacion.className = 'fixed top-4 right-4 bg-blue-500 text-white px-6 py-4 rounded-lg shadow-lg z-50 max-w-sm';
-  notificacion.innerHTML = `
-    <div class="flex items-start">
-      <div class="flex-shrink-0">
-        <svg class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      </div>
-      <div class="ml-3">
-        <p class="text-sm font-medium">${titulo}</p>
-        <p class="text-sm text-blue-100 mt-1">${mensaje}</p>
-      </div>
-      <button onclick="this.parentElement.parentElement.remove()" class="ml-4 text-blue-200 hover:text-white">
-        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-        </svg>
-      </button>
-    </div>
-  `;
-  
-  document.body.appendChild(notificacion);
-  
-  // Auto-remover después de 5 segundos
-  setTimeout(() => {
-    if (notificacion.parentElement) {
-      notificacion.remove();
-    }
-  }, 5000);
-}
-
-// Cuenta turnos de una fecha YYYY-MM-DD
-async function contarTurnosDia(fechaISO) {
-  const { count, error } = await supabase
-    .from('turnos')
-    .select('id', { count: 'exact', head: true })
-    .eq('negocio_id', negocioId)
-    .eq('fecha', fechaISO);
-
-  if (error) throw new Error(error.message);
-  return count || 0;
-}
-
-/**
- * Llama a esta función cuando el usuario intente reservar.
- * - nombre, telefono, servicio: strings
- * - fechaISO: "YYYY-MM-DD" (ej. 2025-08-12)
- * - horaHHMM: "HH:MM" 24h (ej. "14:30")
- */
-// ===== FUNCIONES DE VERIFICACIÓN DE BREAK =====
-
-// Verificar si el negocio está en break
-async function verificarBreakNegocio() {
-  try {
-    const { data, error } = await supabase
-      .from('estado_negocio')
-      .select('en_break, break_end_time, break_message')
-      .eq('negocio_id', negocioId)
-      .single();
-
-    if (error && error.code !== 'PGRST116') {
-      return { enBreak: false, mensaje: null };
-    }
-
-    if (data && data.en_break) {
-      const endTime = new Date(data.break_end_time);
-      const now = new Date();
-      
-      if (endTime > now) {
-        return { 
-          enBreak: true, 
-          mensaje: data.break_message || 'Estamos en break, regresamos pronto...',
-          tiempoRestante: Math.ceil((endTime - now) / (1000 * 60)) // en minutos
-        };
-      }
-    }
-    
-    return { enBreak: false, mensaje: null };
-  } catch (error) {
-    console.error('Error al verificar break:', error);
-    return { enBreak: false, mensaje: null };
-  }
-}
-
-// Mostrar notificación de break
-function mostrarNotificacionBreak(mensaje, tiempoRestante) {
-  const notificacion = document.createElement('div');
-  notificacion.className = 'fixed top-4 right-4 bg-orange-500 text-white p-4 rounded-lg shadow-lg z-50 max-w-sm';
-  notificacion.innerHTML = `
-    <div class="flex items-start space-x-3">
-      <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-      <div>
-        <h4 class="font-semibold mb-1">Negocio en Break</h4>
-        <p class="text-sm mb-2">${mensaje}</p>
-        <p class="text-xs opacity-90">Tiempo estimado: ${tiempoRestante} minutos</p>
-      </div>
-      <button onclick="this.parentElement.parentElement.remove()" class="text-white hover:text-gray-200 ml-2">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-        </svg>
-      </button>
-    </div>
-  `;
-  
-  document.body.appendChild(notificacion);
-  
-  // Auto-remover después de 8 segundos
-  setTimeout(() => {
-    if (notificacion.parentElement) {
-      notificacion.remove();
-    }
-  }, 8000);
-}
-
+// ===== API programática: tomarTurno con fecha/hora especificadas =====
 export async function tomarTurno(nombre, telefono, servicio, fechaISO, horaHHMM) {
   try {
-    // Verificar si el negocio está en break
+    // Verificar día laboral para la fecha dada
+    const fechaObj = new Date(`${fechaISO}T00:00:00`);
+    const esDiaLaboral = await verificarDiaLaboralFecha(fechaObj);
+    if (!esDiaLaboral) {
+      alert('La fecha seleccionada no es un día laboral.');
+      return;
+    }
+
+    // Verificar break
     const estadoBreak = await verificarBreakNegocio();
     if (estadoBreak.enBreak) {
       mostrarNotificacionBreak(estadoBreak.mensaje, estadoBreak.tiempoRestante);
       return;
     }
 
-    // Usar configuración del cache actualizada en tiempo real
-    const aperturaMin = hhmmToMinutes(configCache.hora_apertura);
-    const cierreMin   = hhmmToMinutes(configCache.hora_cierre);
-    const horaMin     = hhmmToMinutes(horaHHMM);
-
     // Validar hora dentro del horario [apertura, cierre]
+    const aperturaMin = hhmmToMinutes(configCache.hora_apertura);
+    const cierreMin = hhmmToMinutes(configCache.hora_cierre);
+    const horaMin = hhmmToMinutes(horaHHMM);
     if (horaMin < aperturaMin || horaMin > cierreMin) {
       alert(`⛔ El negocio solo atiende de ${configCache.hora_apertura} a ${configCache.hora_cierre}.`);
       return;
@@ -795,25 +769,25 @@ export async function tomarTurno(nombre, telefono, servicio, fechaISO, horaHHMM)
 
     // Inserta turno
     const ahora = new Date();
-    const { error: insertError } = await supabase.from('turnos').insert([{
-      negocio_id: negocioId,
-      nombre,
-      telefono,
-      servicio,
-      estado: 'En espera',
-      fecha: fechaISO,
-      hora: horaHHMM,
-      created_at: ahora.toISOString()
-    }]);
+    const { error: insertError } = await supabase.from('turnos').insert([
+      {
+        negocio_id: negocioId,
+        nombre,
+        telefono,
+        servicio,
+        estado: 'En espera',
+        fecha: fechaISO,
+        hora: horaHHMM,
+        created_at: ahora.toISOString(),
+      }
+    ]);
 
     if (insertError) {
       console.error(insertError);
       alert('❌ Error al registrar el turno.');
     } else {
       alert('✅ Turno registrado con éxito.');
-      // aquí puedes refrescar listas, etc.
     }
-
   } catch (e) {
     console.error(e);
     alert('❌ No se pudo validar la configuración del negocio.');

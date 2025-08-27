@@ -1,4 +1,48 @@
-import { supabase } from '../database.js';
+// Función para guardar configuración
+async function guardarConfiguracion(event) {
+  event.preventDefault();
+  
+  try {
+    const horaApertura = document.getElementById('hora-apertura').value;
+    const horaCierre = document.getElementById('hora-cierre').value;
+    const limiteTurnosRaw = parseInt(document.getElementById('limite-turnos').value);
+    const limiteTurnos = Number.isNaN(limiteTurnosRaw) ? null : limiteTurnosRaw;
+    
+    // Obtener días seleccionados (UI usa números) y mapearlos a nombres (text[] en DB)
+    const dayNumToName = { 0: 'Domingo', 1: 'Lunes', 2: 'Martes', 3: 'Miércoles', 4: 'Jueves', 5: 'Viernes', 6: 'Sábado' };
+    const diasOperacion = [];
+    document.querySelectorAll('.day-btn').forEach(button => {
+      if (button.classList.contains('bg-blue-500')) {
+        const dn = parseInt(button.getAttribute('data-day'));
+        if (!Number.isNaN(dn) && dayNumToName[dn]) {
+          diasOperacion.push(dayNumToName[dn]);
+        }
+      }
+    });
+    
+    // NUEVA VALIDACIÓN: Verificar que al menos un día esté seleccionado
+    if (diasOperacion.length === 0) {
+      mostrarNotificacion('Error de Configuración', 'Debe seleccionar al menos un día de operación para el negocio. Sin días laborales configurados, no se podrán tomar turnos.', 'warning');
+      return;
+    }
+    
+    const { error } = await supabase
+      .from('configuracion_negocio')
+      .upsert({
+        negocio_id: negocioId,
+        hora_apertura: horaApertura || null,
+        hora_cierre: horaCierre || null,
+        limite_turnos: limiteTurnos,
+        dias_operacion: diasOperacion.length ? diasOperacion : null
+      }, { onConflict: 'negocio_id' });
+
+    if (error) throw error;
+    
+    mostrarNotificacion('Éxito', 'Configuración guardada correctamente', 'success');
+  } catch (error) {
+    mostrarNotificacion('Error', `No se pudo guardar la configuración: ${error.message}`, 'error');
+  }
+}import { supabase } from '../database.js';
 
 const negocioId = 'barberia0001';
 

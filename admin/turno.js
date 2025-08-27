@@ -126,16 +126,63 @@ function initThemeToggle() {
   const htmlElement = document.documentElement;
   
   // Verificar preferencia guardada
-  const savedTheme = localStorage.getItem('theme');
-  if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-    htmlElement.classList.add('dark');
-  } else {
-    htmlElement.classList.remove('dark');
+// Función para verificar si una fecha es día laboral
+async function verificarDiaLaboralFecha(fecha = new Date()) {
+  try {
+    const { data, error } = await supabase
+      .from('configuracion_negocio')
+      .select('dias_operacion')
+      .eq('negocio_id', negocioId)
+      .single();
+
+    if (error) {
+      console.warn('No se pudo verificar configuración de días laborales:', error);
+      return true; // Permitir por defecto si no hay configuración
+    }
+
+    if (!data || !Array.isArray(data.dias_operacion) || data.dias_operacion.length === 0) {
+      return false; // No hay días configurados
+    }
+
+    const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+    const diaFecha = diasSemana[fecha.getDay()];
+    
+    return data.dias_operacion.includes(diaFecha);
+  } catch (error) {
+    console.error('Error al verificar día laboral:', error);
+    return true; // Permitir por defecto en caso de error
   }
-  
-  themeToggle?.addEventListener('click', () => {
-    htmlElement.classList.toggle('dark');
-    const isDark = htmlElement.classList.contains('dark');
+}
+
+// Modificar la función tomarTurno para incluir validación de día laboral
+async function tomarTurno(event) {
+  event.preventDefault();
+  console.log("tomarTurno llamada");
+
+  // Asegurar configuración al día (incluye dias_operacion)
+  await cargarHoraLimite();
+
+  // Validar día operacional
+  const esDiaLaboral = await verificarDiaLaboralFecha(new Date());
+  if (!esDiaLaboral) {
+    mostrarNotificacion('Hoy no es un día laboral. No se pueden tomar turnos en este día.', 'error');
+    return;
+  }
+
+  // ... existing code ...
+}
+
+// Cargar tema guardado
+const savedTheme = localStorage.getItem('theme');
+if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+  htmlElement.classList.add('dark');
+} else {
+  htmlElement.classList.remove('dark');
+}
+
+themeToggle?.addEventListener('click', () => {
+  htmlElement.classList.toggle('dark');
+  const isDark = htmlElement.classList.contains('dark');
     localStorage.setItem('theme', isDark ? 'dark' : 'light');
   });
 }
