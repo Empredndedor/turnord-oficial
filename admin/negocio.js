@@ -1,48 +1,4 @@
-// Función para guardar configuración
-async function guardarConfiguracion(event) {
-  event.preventDefault();
-  
-  try {
-    const horaApertura = document.getElementById('hora-apertura').value;
-    const horaCierre = document.getElementById('hora-cierre').value;
-    const limiteTurnosRaw = parseInt(document.getElementById('limite-turnos').value);
-    const limiteTurnos = Number.isNaN(limiteTurnosRaw) ? null : limiteTurnosRaw;
-    
-    // Obtener días seleccionados (UI usa números) y mapearlos a nombres (text[] en DB)
-    const dayNumToName = { 0: 'Domingo', 1: 'Lunes', 2: 'Martes', 3: 'Miércoles', 4: 'Jueves', 5: 'Viernes', 6: 'Sábado' };
-    const diasOperacion = [];
-    document.querySelectorAll('.day-btn').forEach(button => {
-      if (button.classList.contains('bg-blue-500')) {
-        const dn = parseInt(button.getAttribute('data-day'));
-        if (!Number.isNaN(dn) && dayNumToName[dn]) {
-          diasOperacion.push(dayNumToName[dn]);
-        }
-      }
-    });
-    
-    // NUEVA VALIDACIÓN: Verificar que al menos un día esté seleccionado
-    if (diasOperacion.length === 0) {
-      mostrarNotificacion('Error de Configuración', 'Debe seleccionar al menos un día de operación para el negocio. Sin días laborales configurados, no se podrán tomar turnos.', 'warning');
-      return;
-    }
-    
-    const { error } = await supabase
-      .from('configuracion_negocio')
-      .upsert({
-        negocio_id: negocioId,
-        hora_apertura: horaApertura || null,
-        hora_cierre: horaCierre || null,
-        limite_turnos: limiteTurnos,
-        dias_operacion: diasOperacion.length ? diasOperacion : null
-      }, { onConflict: 'negocio_id' });
-
-    if (error) throw error;
-    
-    mostrarNotificacion('Éxito', 'Configuración guardada correctamente', 'success');
-  } catch (error) {
-    mostrarNotificacion('Error', `No se pudo guardar la configuración: ${error.message}`, 'error');
-  }
-}import { supabase } from '../database.js';
+import { supabase } from '../database.js';
 
 const negocioId = 'barberia0001';
 
@@ -63,13 +19,20 @@ document.addEventListener('DOMContentLoaded', () => {
   inicializarGrafico();
   initBreakControl();
   verificarEstadoBreak();
+
+  // Event listeners seguros (DOM ya cargado)
+  const btnExport = document.getElementById('exportExcel');
+  if (btnExport) btnExport.addEventListener('click', exportarAExcel);
+  const formConfig = document.getElementById('config-form');
+  if (formConfig) formConfig.addEventListener('submit', guardarConfiguracion);
 });
 
-// Función para inicializar el toggle de tema oscuro/claro
+// ===== Apariencia / Tema =====
 function initThemeToggle() {
   const themeToggle = document.getElementById('theme-toggle');
   const htmlElement = document.documentElement;
-  
+  if (!themeToggle) return;
+
   // Verificar si hay una preferencia guardada
   const savedTheme = localStorage.getItem('theme');
   if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
@@ -77,7 +40,7 @@ function initThemeToggle() {
   } else {
     htmlElement.classList.remove('dark');
   }
-  
+
   themeToggle.addEventListener('click', () => {
     htmlElement.classList.toggle('dark');
     const isDark = htmlElement.classList.contains('dark');
@@ -85,35 +48,32 @@ function initThemeToggle() {
   });
 }
 
-// Función para actualizar la fecha y hora actual
 function actualizarFechaHora() {
   const ahora = new Date();
   const opciones = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
   const fechaFormateada = ahora.toLocaleDateString('es-ES', opciones);
   const horaFormateada = ahora.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-  
-  document.getElementById('fecha-actual').textContent = fechaFormateada.charAt(0).toUpperCase() + fechaFormateada.slice(1);
-  document.getElementById('hora-actual').textContent = horaFormateada;
+
+  const fechaEl = document.getElementById('fecha-actual');
+  const horaEl = document.getElementById('hora-actual');
+  if (fechaEl) fechaEl.textContent = fechaFormateada.charAt(0).toUpperCase() + fechaFormateada.slice(1);
+  if (horaEl) horaEl.textContent = horaFormateada;
 }
 
-// Configuración del menú móvil
 function setupMobileMenu() {
   const mobileMenuButton = document.getElementById('mobile-menu-button');
   const sidebar = document.getElementById('sidebar');
   const overlay = document.getElementById('sidebar-overlay');
-  
+
   if (mobileMenuButton && sidebar && overlay) {
-    mobileMenuButton.addEventListener('click', toggleMobileMenu);
-    overlay.addEventListener('click', toggleMobileMenu);
+    const toggle = () => toggleMobileMenu(sidebar, overlay);
+    mobileMenuButton.addEventListener('click', toggle);
+    overlay.addEventListener('click', toggle);
   }
 }
 
-function toggleMobileMenu() {
-  const sidebar = document.getElementById('sidebar');
-  const overlay = document.getElementById('sidebar-overlay');
-  
+function toggleMobileMenu(sidebar, overlay) {
   sidebar.classList.toggle('-translate-x-full');
-  
   if (sidebar.classList.contains('-translate-x-full')) {
     overlay.classList.add('opacity-0', 'pointer-events-none');
   } else {
@@ -121,10 +81,9 @@ function toggleMobileMenu() {
   }
 }
 
-// Inicializar botones de días de operación
+// ===== Días de operación (UI) =====
 function initDayButtons() {
   const dayButtons = document.querySelectorAll('.day-btn');
-
   const applySelected = (btn, selected) => {
     // Limpiar posibles clases grises heredadas del domingo
     btn.classList.remove('bg-gray-100', 'dark:bg-gray-700', 'text-gray-400');
@@ -136,7 +95,7 @@ function initDayButtons() {
       btn.classList.add('bg-blue-100', 'dark:bg-blue-900', 'text-blue-800', 'dark:text-blue-200');
     }
   };
-  
+
   dayButtons.forEach(button => {
     button.addEventListener('click', () => {
       const willSelect = !button.classList.contains('bg-blue-500');
@@ -145,7 +104,7 @@ function initDayButtons() {
   });
 }
 
-// Función para obtener ganancias agrupadas por fecha
+// ===== Datos y exportación =====
 async function obtenerGanancias() {
   try {
     const { data, error } = await supabase
@@ -157,17 +116,15 @@ async function obtenerGanancias() {
 
     // Agrupar y sumar montos por fecha
     const resumen = {};
-    data.forEach(({ fecha, monto_cobrado }) => {
-      // Validar monto_cobrado
+    (data || []).forEach(({ fecha, monto_cobrado }) => {
       const monto = Number(monto_cobrado);
       if (!resumen[fecha]) resumen[fecha] = 0;
       resumen[fecha] += isNaN(monto) ? 0 : monto;
     });
 
-    // Convertir a array
     return Object.entries(resumen).map(([fecha, ganancia]) => ({
       Fecha: fecha,
-      Ganancia: ganancia.toFixed(2),
+      Ganancia: Number(ganancia).toFixed(2),
     }));
   } catch (error) {
     mostrarNotificacion('Error', `No se pudieron obtener los datos de ganancias: ${error.message}`, 'error');
@@ -175,7 +132,6 @@ async function obtenerGanancias() {
   }
 }
 
-// Función para exportar a Excel
 async function exportarAExcel() {
   try {
     let ingresos = await obtenerGanancias();
@@ -188,82 +144,75 @@ async function exportarAExcel() {
     // Ordenar por fecha ascendente
     ingresos = ingresos.sort((a, b) => new Date(a.Fecha) - new Date(b.Fecha));
 
-    // Calcular total general
+    // Calcular total general y agregar como fila final
     const total = ingresos.reduce((sum, fila) => sum + Number(fila.Ganancia), 0);
-
-    // Agregar fila de total general
-    ingresos.push({
-      Fecha: 'TOTAL',
-      Ganancia: total.toFixed(2),
-    });
+    ingresos.push({ Fecha: 'TOTAL', Ganancia: total.toFixed(2) });
 
     const ws = XLSX.utils.json_to_sheet(ingresos);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Ingresos');
-
     XLSX.writeFile(wb, 'historial_ingresos.xlsx');
-    
+
     mostrarNotificacion('Éxito', 'El archivo Excel ha sido generado correctamente', 'success');
   } catch (error) {
     mostrarNotificacion('Error', `No se pudo exportar a Excel: ${error.message}`, 'error');
   }
 }
 
-// Función para mostrar ganancias del día, semana y mes
 async function mostrarTotales() {
   try {
     const ingresos = await obtenerGanancias();
 
-    // Obtener fechas actuales
+    // Fechas actuales
     const hoy = new Date();
     const diaActual = hoy.toISOString().slice(0, 10);
 
-    // Calcular inicio de semana (lunes)
+    // Inicio de semana (lunes)
     const primerDiaSemana = new Date(hoy);
     primerDiaSemana.setDate(hoy.getDate() - hoy.getDay() + 1);
     const inicioSemana = primerDiaSemana.toISOString().slice(0, 10);
 
-    // Calcular inicio de mes
+    // Inicio de mes
     const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().slice(0, 10);
 
     let totalDia = 0, totalSemana = 0, totalMes = 0;
 
     ingresos.forEach(({ Fecha, Ganancia }) => {
-      if (Fecha === 'TOTAL') return; // Saltar fila de total
-
-      if (Fecha === diaActual) totalDia += Number(Ganancia);
-
-      if (Fecha >= inicioSemana && Fecha <= diaActual) totalSemana += Number(Ganancia);
-
-      if (Fecha >= inicioMes && Fecha <= diaActual) totalMes += Number(Ganancia);
+      if (Fecha === 'TOTAL') return;
+      const g = Number(Ganancia);
+      if (Fecha === diaActual) totalDia += g;
+      if (Fecha >= inicioSemana && Fecha <= diaActual) totalSemana += g;
+      if (Fecha >= inicioMes && Fecha <= diaActual) totalMes += g;
     });
 
-    // Actualizar valores en el DOM
-    document.getElementById('ganancia-dia').textContent = totalDia.toFixed(2);
-    document.getElementById('ganancia-semana').textContent = totalSemana.toFixed(2);
-    document.getElementById('ganancia-mes').textContent = totalMes.toFixed(2);
-    
-    // Actualizar barras de progreso
-    const maxGanancia = Math.max(totalDia, totalSemana, totalMes);
-    if (maxGanancia > 0) {
-      document.getElementById('barra-dia').style.width = `${(totalDia / maxGanancia) * 100}%`;
-      document.getElementById('barra-semana').style.width = `${(totalSemana / maxGanancia) * 100}%`;
-      document.getElementById('barra-mes').style.width = `${(totalMes / maxGanancia) * 100}%`;
-    }
-    
-    // Actualizar gráfico
+    const diaEl = document.getElementById('ganancia-dia');
+    const semEl = document.getElementById('ganancia-semana');
+    const mesEl = document.getElementById('ganancia-mes');
+    if (diaEl) diaEl.textContent = totalDia.toFixed(2);
+    if (semEl) semEl.textContent = totalSemana.toFixed(2);
+    if (mesEl) mesEl.textContent = totalMes.toFixed(2);
+
+    const maxGanancia = Math.max(totalDia, totalSemana, totalMes, 1);
+    const barraDia = document.getElementById('barra-dia');
+    const barraSem = document.getElementById('barra-semana');
+    const barraMes = document.getElementById('barra-mes');
+    if (barraDia) barraDia.style.width = `${(totalDia / maxGanancia) * 100}%`;
+    if (barraSem) barraSem.style.width = `${(totalSemana / maxGanancia) * 100}%`;
+    if (barraMes) barraMes.style.width = `${(totalMes / maxGanancia) * 100}%`;
+
     actualizarGraficoIngresos(ingresos);
   } catch (error) {
     console.error('Error al mostrar totales:', error);
   }
 }
 
-// Inicializar gráfico de ingresos
+// ===== Gráfico de ingresos (Chart.js) =====
 let ingresosChart;
 function inicializarGrafico() {
-  const ctx = document.getElementById('ingresos-chart').getContext('2d');
-  
-  // Configuración del gráfico
+  const canvas = document.getElementById('ingresos-chart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+
   ingresosChart = new Chart(ctx, {
     type: 'line',
     data: {
@@ -285,39 +234,27 @@ function inicializarGrafico() {
         legend: {
           display: true,
           position: 'top',
-          labels: {
-            color: document.documentElement.classList.contains('dark') ? '#e2e8f0' : '#1e293b'
-          }
+          labels: { color: document.documentElement.classList.contains('dark') ? '#e2e8f0' : '#1e293b' }
         },
         tooltip: {
           mode: 'index',
           intersect: false,
           callbacks: {
-            label: function(context) {
-              return `Ingresos: $${context.raw}`;
-            }
+            label: function(context) { return `Ingresos: $${context.raw}`; }
           }
         }
       },
       scales: {
         x: {
-          grid: {
-            color: document.documentElement.classList.contains('dark') ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
-          },
-          ticks: {
-            color: document.documentElement.classList.contains('dark') ? '#e2e8f0' : '#1e293b'
-          }
+          grid: { color: document.documentElement.classList.contains('dark') ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)' },
+          ticks: { color: document.documentElement.classList.contains('dark') ? '#e2e8f0' : '#1e293b' }
         },
         y: {
           beginAtZero: true,
-          grid: {
-            color: document.documentElement.classList.contains('dark') ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
-          },
+          grid: { color: document.documentElement.classList.contains('dark') ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)' },
           ticks: {
             color: document.documentElement.classList.contains('dark') ? '#e2e8f0' : '#1e293b',
-            callback: function(value) {
-              return '$' + value;
-            }
+            callback: function(value) { return '$' + value; }
           }
         }
       }
@@ -325,34 +262,29 @@ function inicializarGrafico() {
   });
 }
 
-// Actualizar datos del gráfico
 function actualizarGraficoIngresos(ingresos) {
   if (!ingresosChart) return;
-  
-  // Filtrar solo los últimos 14 días para el gráfico
+
   const hoy = new Date();
   const hace14Dias = new Date();
   hace14Dias.setDate(hoy.getDate() - 14);
-  
-  const datosRecientes = ingresos
+
+  const datosRecientes = (ingresos || [])
     .filter(item => item.Fecha !== 'TOTAL' && new Date(item.Fecha) >= hace14Dias)
     .sort((a, b) => new Date(a.Fecha) - new Date(b.Fecha));
-  
-  // Formatear fechas para el gráfico
+
   const labels = datosRecientes.map(item => {
     const fecha = new Date(item.Fecha);
     return fecha.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' });
   });
-  
   const datos = datosRecientes.map(item => Number(item.Ganancia));
-  
-  // Actualizar el gráfico
+
   ingresosChart.data.labels = labels;
   ingresosChart.data.datasets[0].data = datos;
   ingresosChart.update();
 }
 
-// Función para cargar configuración del negocio
+// ===== Configuración del negocio =====
 async function cargarConfiguracion() {
   try {
     const { data, error } = await supabase
@@ -364,25 +296,21 @@ async function cargarConfiguracion() {
     if (error) throw error;
 
     if (data) {
-      // Establecer valores en los campos del formulario
-      if (data.hora_apertura) document.getElementById('hora-apertura').value = data.hora_apertura;
-      if (data.hora_cierre) document.getElementById('hora-cierre').value = data.hora_cierre;
-      if (data.limite_turnos) document.getElementById('limite-turnos').value = data.limite_turnos;
-      
-      // Configurar días de operación si existen
+      if (data.hora_apertura) {
+        const el = document.getElementById('hora-apertura');
+        if (el) el.value = data.hora_apertura;
+      }
+      if (data.hora_cierre) {
+        const el = document.getElementById('hora-cierre');
+        if (el) el.value = data.hora_cierre;
+      }
+      if (data.limite_turnos) {
+        const el = document.getElementById('limite-turnos');
+        if (el) el.value = data.limite_turnos;
+      }
+
       if (data.dias_operacion && Array.isArray(data.dias_operacion)) {
-        // Mapear nombres -> números según UI (0=Domingo,1=Lunes,...,6=Sábado)
-        const dayNameToNum = {
-          'Domingo': 0,
-          'Lunes': 1,
-          'Martes': 2,
-          'Miércoles': 3,
-          'Miercoles': 3, // tolerar sin tilde
-          'Jueves': 4,
-          'Viernes': 5,
-          'Sábado': 6,
-          'Sabado': 6 // tolerar sin tilde
-        };
+        const dayNameToNum = { 'Domingo': 0, 'Lunes': 1, 'Martes': 2, 'Miércoles': 3, 'Miercoles': 3, 'Jueves': 4, 'Viernes': 5, 'Sábado': 6, 'Sabado': 6 };
         const selectedDays = data.dias_operacion
           .map(name => dayNameToNum[name])
           .filter(n => typeof n === 'number' && !Number.isNaN(n));
@@ -391,7 +319,6 @@ async function cargarConfiguracion() {
         dayButtons.forEach(button => {
           const day = parseInt(button.getAttribute('data-day'));
           const selected = selectedDays.includes(day);
-          // Unificar estilo seleccionado/no seleccionado y limpiar grises de domingo
           button.classList.remove('bg-gray-100', 'dark:bg-gray-700', 'text-gray-400');
           if (selected) {
             button.classList.add('bg-blue-500', 'text-white');
@@ -408,47 +335,48 @@ async function cargarConfiguracion() {
   }
 }
 
-// Función para guardar configuración
 async function guardarConfiguracion(event) {
   event.preventDefault();
-  
   try {
-    const horaApertura = document.getElementById('hora-apertura').value;
-    const horaCierre = document.getElementById('hora-cierre').value;
-    const limiteTurnosRaw = parseInt(document.getElementById('limite-turnos').value);
+    const horaApertura = (document.getElementById('hora-apertura')?.value) || null;
+    const horaCierre = (document.getElementById('hora-cierre')?.value) || null;
+    const limiteTurnosRaw = parseInt(document.getElementById('limite-turnos')?.value);
     const limiteTurnos = Number.isNaN(limiteTurnosRaw) ? null : limiteTurnosRaw;
-    
-    // Obtener días seleccionados (UI usa números) y mapearlos a nombres (text[] en DB)
+
     const dayNumToName = { 0: 'Domingo', 1: 'Lunes', 2: 'Martes', 3: 'Miércoles', 4: 'Jueves', 5: 'Viernes', 6: 'Sábado' };
     const diasOperacion = [];
     document.querySelectorAll('.day-btn').forEach(button => {
       if (button.classList.contains('bg-blue-500')) {
         const dn = parseInt(button.getAttribute('data-day'));
-        if (!Number.isNaN(dn) && dayNumToName[dn]) {
-          diasOperacion.push(dayNumToName[dn]);
-        }
+        if (!Number.isNaN(dn) && dayNumToName[dn]) diasOperacion.push(dayNumToName[dn]);
       }
     });
-    
+
+    // Validación: al menos un día seleccionado
+    if (!diasOperacion.length) {
+      mostrarNotificacion('Error de Configuración', 'Debe seleccionar al menos un día de operación para el negocio. Sin días laborales configurados, no se podrán tomar turnos.', 'warning');
+      return;
+    }
+
     const { error } = await supabase
       .from('configuracion_negocio')
       .upsert({
         negocio_id: negocioId,
-        hora_apertura: horaApertura || null,
-        hora_cierre: horaCierre || null,
+        hora_apertura: horaApertura,
+        hora_cierre: horaCierre,
         limite_turnos: limiteTurnos,
-        dias_operacion: diasOperacion.length ? diasOperacion : null
+        dias_operacion: diasOperacion
       }, { onConflict: 'negocio_id' });
 
     if (error) throw error;
-    
+
     mostrarNotificacion('Éxito', 'Configuración guardada correctamente', 'success');
   } catch (error) {
     mostrarNotificacion('Error', `No se pudo guardar la configuración: ${error.message}`, 'error');
   }
 }
 
-// Función para mostrar notificaciones con SweetAlert2
+// ===== Notificaciones =====
 function mostrarNotificacion(titulo, mensaje, tipo) {
   Swal.fire({
     title: titulo,
@@ -462,16 +390,11 @@ function mostrarNotificacion(titulo, mensaje, tipo) {
 }
 
 // ===== FUNCIONES DE CONTROL DE BREAK =====
-
-// Inicializar controles de break
 function initBreakControl() {
   const toggleBreakBtn = document.getElementById('toggle-break');
-  if (toggleBreakBtn) {
-    toggleBreakBtn.addEventListener('click', toggleBreak);
-  }
+  if (toggleBreakBtn) toggleBreakBtn.addEventListener('click', toggleBreak);
 }
 
-// Verificar estado actual del break desde Supabase
 async function verificarEstadoBreak() {
   try {
     const { data, error } = await supabase
@@ -480,22 +403,17 @@ async function verificarEstadoBreak() {
       .eq('negocio_id', negocioId)
       .single();
 
-    if (error && error.code !== 'PGRST116') {
-      throw error;
-    }
+    if (error && error.code !== 'PGRST116') throw error;
 
     if (data && data.en_break) {
       const endTime = new Date(data.break_end_time);
       const now = new Date();
-      
       if (endTime > now) {
-        // El break aún está activo
         breakActivo = true;
         breakEndTime = endTime;
         actualizarUIBreak(true);
         iniciarTemporizador();
       } else {
-        // El break ya expiró, actualizar estado
         await finalizarBreak();
       }
     } else {
@@ -506,25 +424,18 @@ async function verificarEstadoBreak() {
   }
 }
 
-// Alternar estado del break
 async function toggleBreak() {
-  if (breakActivo) {
-    await finalizarBreak();
-  } else {
-    await iniciarBreak();
-  }
+  if (breakActivo) await finalizarBreak(); else await iniciarBreak();
 }
 
-// Iniciar break
 async function iniciarBreak() {
   try {
-    const duracion = parseInt(document.getElementById('break-duration').value) || 30;
-    const mensaje = document.getElementById('break-message').value || 'Estamos en break, regresamos pronto...';
-    
+    const duracion = parseInt(document.getElementById('break-duration')?.value) || 30;
+    const mensaje = document.getElementById('break-message')?.value || 'Estamos en break, regresamos pronto...';
+
     const now = new Date();
     const endTime = new Date(now.getTime() + (duracion * 60 * 1000));
-    
-    // Guardar estado en Supabase
+
     const { error } = await supabase
       .from('estado_negocio')
       .upsert({
@@ -542,7 +453,6 @@ async function iniciarBreak() {
     breakEndTime = endTime;
     actualizarUIBreak(true);
     iniciarTemporizador();
-    
     mostrarNotificacion('Break Iniciado', `Break activo por ${duracion} minutos`, 'success');
   } catch (error) {
     console.error('Error al iniciar break:', error);
@@ -550,10 +460,8 @@ async function iniciarBreak() {
   }
 }
 
-// Finalizar break
 async function finalizarBreak() {
   try {
-    // Actualizar estado en Supabase
     const { error } = await supabase
       .from('estado_negocio')
       .upsert({
@@ -569,12 +477,7 @@ async function finalizarBreak() {
 
     breakActivo = false;
     breakEndTime = null;
-    
-    if (breakInterval) {
-      clearInterval(breakInterval);
-      breakInterval = null;
-    }
-    
+    if (breakInterval) { clearInterval(breakInterval); breakInterval = null; }
     actualizarUIBreak(false);
     mostrarNotificacion('Break Finalizado', 'El negocio está nuevamente abierto', 'success');
   } catch (error) {
@@ -583,16 +486,16 @@ async function finalizarBreak() {
   }
 }
 
-// Actualizar interfaz de usuario del break
 function actualizarUIBreak(enBreak) {
   const indicator = document.getElementById('break-indicator');
   const text = document.getElementById('break-text');
   const button = document.getElementById('toggle-break');
   const buttonText = document.getElementById('break-button-text');
   const timeRemaining = document.getElementById('break-time-remaining');
-  
+
+  if (!indicator || !text || !button || !buttonText || !timeRemaining) return;
+
   if (enBreak) {
-    // Estado: En break
     indicator.className = 'w-3 h-3 rounded-full bg-orange-500';
     text.textContent = 'En Break';
     text.className = 'font-medium text-orange-600 dark:text-orange-400';
@@ -600,7 +503,6 @@ function actualizarUIBreak(enBreak) {
     buttonText.textContent = 'Finalizar Break';
     timeRemaining.classList.remove('hidden');
   } else {
-    // Estado: Abierto
     indicator.className = 'w-3 h-3 rounded-full bg-green-500';
     text.textContent = 'Negocio Abierto';
     text.className = 'font-medium text-green-600 dark:text-green-400';
@@ -610,21 +512,16 @@ function actualizarUIBreak(enBreak) {
   }
 }
 
-// Iniciar temporizador del break
 function iniciarTemporizador() {
-  if (breakInterval) {
-    clearInterval(breakInterval);
-  }
-  
+  if (breakInterval) clearInterval(breakInterval);
+
   breakInterval = setInterval(() => {
     const now = new Date();
     const timeLeft = breakEndTime - now;
-    
+
     if (timeLeft <= 0) {
-      // El break ha terminado
       finalizarBreak();
     } else {
-      // Actualizar tiempo restante
       const minutes = Math.floor(timeLeft / (1000 * 60));
       const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
       const remainingTimeElement = document.getElementById('remaining-time');
@@ -635,7 +532,7 @@ function iniciarTemporizador() {
   }, 1000);
 }
 
-// Función para verificar si el negocio está en break (para uso externo)
+// Verificar si el negocio está en break (para uso externo)
 async function verificarBreakActivo() {
   try {
     const { data, error } = await supabase
@@ -651,16 +548,14 @@ async function verificarBreakActivo() {
     if (data && data.en_break) {
       const endTime = new Date(data.break_end_time);
       const now = new Date();
-      
       if (endTime > now) {
-        return { 
-          enBreak: true, 
+        return {
+          enBreak: true,
           mensaje: data.break_message || 'Estamos en break, regresamos pronto...',
-          tiempoRestante: Math.ceil((endTime - now) / (1000 * 60)) // en minutos
+          tiempoRestante: Math.ceil((endTime - now) / (1000 * 60))
         };
       }
     }
-    
     return { enBreak: false, mensaje: null };
   } catch (error) {
     console.error('Error al verificar break:', error);
@@ -668,11 +563,7 @@ async function verificarBreakActivo() {
   }
 }
 
-// Event Listeners
-document.getElementById('exportExcel').addEventListener('click', exportarAExcel);
-document.getElementById('config-form').addEventListener('submit', guardarConfiguracion);
-
-// Exportar funciones necesarias al objeto window para acceso desde HTML
+// API para otros módulos (si se requiere)
 window.exportarAExcel = exportarAExcel;
 window.mostrarTotales = mostrarTotales;
 window.guardarConfiguracion = guardarConfiguracion;

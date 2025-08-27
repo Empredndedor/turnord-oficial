@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Negocio - TurnoRD</title>
+  <script src="auth.js"></script>
   <script>
     // Aplica tema desde localStorage lo antes posible
     (function () {
@@ -397,29 +398,27 @@
   <script type="module">
     import { supabase } from './database.js';
     const negocioId = 'barberia0001';
-    try {
-      const { data } = await supabase
-        .from('configuracion_negocio')
-        .select('theme_primary, theme_mode')
-        .eq('negocio_id', negocioId)
-        .maybeSingle();
-      if (data) {
-        if (data.theme_primary) localStorage.setItem('theme_primary', data.theme_primary);
-        if (data.theme_mode) localStorage.setItem('theme_mode', data.theme_mode);
-        if (window.theme && window.theme.apply) {
-          window.theme.apply(
-            data.theme_primary || localStorage.getItem('theme_primary') || 'blue',
-            data.theme_mode || localStorage.getItem('theme_mode') || 'light'
-          );
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from('configuracion_negocio')
+          .select('theme_primary, theme_mode')
+          .eq('negocio_id', negocioId)
+          .maybeSingle();
+        if (data) {
+          if (data.theme_primary) localStorage.setItem('theme_primary', data.theme_primary);
+          if (data.theme_mode) localStorage.setItem('theme_mode', data.theme_mode);
+          if (window.theme && window.theme.apply) {
+            window.theme.apply(
+              data.theme_primary || localStorage.getItem('theme_primary') || 'blue',
+              data.theme_mode || localStorage.getItem('theme_mode') || 'light'
+            );
+          }
         }
+      } catch (e) {
+        console.warn('No se pudo sincronizar tema desde DB', e);
       }
-    } catch (e) {
-      console.warn('No se pudo sincronizar tema desde DB', e);
-    }
-  </script>
-  <script type="module">
-    import { supabase } from './database.js';
-    const negocioId = 'barberia0001';
+    })();
 
     async function cargarServicios() {
       const { data, error } = await supabase
@@ -433,12 +432,14 @@
         return;
       }
       const tbody = document.getElementById('tabla-servicios');
+      if (!tbody) return;
       tbody.innerHTML = '';
+      const esc = (v) => String(v == null ? '' : v).replace(/[&<>"]/g, (m) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
       (data || []).forEach(s => {
         const tr = document.createElement('tr');
         tr.innerHTML = `
-          <td class="py-2 px-4"><input class="svc-nombre w-full rounded border dark:border-gray-600 dark:bg-gray-700 dark:text-white px-2 py-1" value="${s.nombre || ''}"></td>
-          <td class="py-2 px-4"><input type="number" min="1" max="240" class="svc-duracion w-24 rounded border dark:border-gray-600 dark:bg-gray-700 dark:text-white px-2 py-1" value="${s.duracion_min ?? 25}"></td>
+          <td class="py-2 px-4"><input class="svc-nombre w-full rounded border dark:border-gray-600 dark:bg-gray-700 dark:text-white px-2 py-1" value="${esc(s.nombre)}"></td>
+          <td class="py-2 px-4"><input type="number" min="1" max="240" class="svc-duracion w-24 rounded border dark:border-gray-600 dark:bg-gray-700 dark:text-white px-2 py-1" value="${s.duracion_min != null ? s.duracion_min : 25}"></td>
           <td class="py-2 px-4"><input type="number" step="0.01" min="0" class="svc-precio w-28 rounded border dark:border-gray-600 dark:bg-gray-700 dark:text-white px-2 py-1" value="${Number(s.precio || 0).toFixed(2)}"></td>
           <td class="py-2 px-4"><input type="checkbox" class="svc-activo" ${s.activo ? 'checked' : ''}></td>
           <td class="py-2 px-4 flex gap-2">

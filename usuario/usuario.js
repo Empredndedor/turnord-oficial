@@ -665,7 +665,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       'postgres_changes',
       { event: '*', schema: 'public', table: 'turnos', filter: `negocio_id=eq.${negocioId}` },
       async () => {
-        telefonoUsuario = localStorage.getItem('telefonoUsuario');
+       telefonoUsuario = localStorage.getItem('telefonoUsuario');
         if (telefonoUsuario) {
           const { data, error } = await supabase
             .from('turnos')
