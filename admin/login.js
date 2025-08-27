@@ -6,7 +6,22 @@ document.getElementById("loginForm").addEventListener("submit", function (e) {
 
   // Validar credenciales
   if (usuario === "persona1" && clave === "12345") {
-    window.location.href = "panel.html"; // Redirige al panel
+    try {
+      // Establecer sesión para el guard (auth.js lee 'authToken')
+      localStorage.setItem("authToken", "1");
+
+      // Si hay parámetro 'next', regresar a la página original
+      const params = new URLSearchParams(window.location.search);
+      const next = params.get("next");
+      if (next) {
+        window.location.replace(next);
+      } else {
+        window.location.replace("panel.html");
+      }
+    } catch (err) {
+      // Fallback mínimo
+      window.location.href = "panel.html";
+    }
   } else {
     document.getElementById("error").classList.remove("hidden");
   }
