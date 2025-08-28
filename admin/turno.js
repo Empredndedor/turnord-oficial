@@ -607,7 +607,11 @@ async function cargarTurnos() {
     }
   }
   
-  console.log("Turno actual:", turnoActual);
+  if (turnoActual) {
+    console.log(`Turno actual: ${turnoActual.turno} (id: ${turnoActual.id || 's/n'})`, turnoActual);
+  } else {
+    console.log("Turno actual: --");
+  }
   
   // Calcular tiempo promedio de espera mejorado
   if (dataRender.length > 0) {
