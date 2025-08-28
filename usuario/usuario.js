@@ -665,7 +665,21 @@ window.addEventListener('DOMContentLoaded', async () => {
       'postgres_changes',
       { event: '*', schema: 'public', table: 'turnos', filter: `negocio_id=eq.${negocioId}` },
       async () => {
-       telefonoUsuario = localStorage.getItem('telefonoUsuario');
+    // ... existing code ...
+
+// Suscripción a cambios de servicios
+supabase
+  .channel('servicios-usuario')
+  .on(
+    'postgres_changes',
+    { event: '*', schema: 'public', table: 'servicios', filter: `negocio_id=eq.${negocioId}` },
+    async () => {
+      await cargarServiciosActivos();
+    }
+  )
+  .subscribe();
+
+// ... existing code ...   telefonoUsuario = localStorage.getItem('telefonoUsuario');
         if (telefonoUsuario) {
           const { data, error } = await supabase
             .from('turnos')

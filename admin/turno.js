@@ -182,7 +182,21 @@ if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-s
 
 themeToggle?.addEventListener('click', () => {
   htmlElement.classList.toggle('dark');
-  const isDark = htmlElement.classList.contains('dark');
+  const isDark = htmlElement.classList.contains('dark');// ... existing code ...
+
+// Suscripción a cambios de servicios
+supabase
+  .channel('servicios-turno')
+  .on(
+    'postgres_changes',
+    { event: '*', schema: 'public', table: 'servicios', filter: `negocio_id=eq.${negocioId}` },
+    async () => {
+      await cargarServicios();
+    }
+  )
+  .subscribe();
+
+// ... existing code ...
     localStorage.setItem('theme', isDark ? 'dark' : 'light');
   });
 }
