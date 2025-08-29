@@ -196,7 +196,8 @@ supabase
   )
   .subscribe();
 
-// ... existing code ...
+// ... existing code ...SUPABASE_URL=https://fhequkvqxsbdkmgmoftp.supabase.co
+SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZoZXF1a3ZxeHNiZGttZ21vZnRwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM5MTM3NzAsImV4cCI6MjA2OTQ4OTc3MH0.tVXmyBG39oxWJVlmFwHXAaYDBWxakssZ7g-BywmlZEM
     localStorage.setItem('theme', isDark ? 'dark' : 'light');
   });
 }

@@ -1,0 +1,19 @@
+# Variables de entorno
+.env
+.env.local
+.env.production
+
+# Archivos de configuración sensibles
+config.js
+secrets.js
+
+# Logs
+*.log
+npm-debug.log*
+
+# Dependencias
+node_modules/
+
+# Archivos temporales
+.DS_Store
+Thumbs.db
