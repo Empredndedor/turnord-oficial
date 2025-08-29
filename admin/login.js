@@ -1,28 +1,29 @@
-document.getElementById("loginForm").addEventListener("submit", function (e) {
-  e.preventDefault(); // Previene que se recargue la página
+import { supabase } from '../database.js';
 
-  const usuario = document.getElementById("username").value;
-  const clave = document.getElementById("password").value;
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
 
-  // Validar credenciales
-  if (usuario === "persona1" && clave === "12345") {
-    try {
-      // Establecer sesión para el guard (auth.js lee 'authToken')
-      localStorage.setItem("authToken", "1");
+  const email = document.getElementById('email').value;
+  const password = document.getElementById('password').value;
+  const errorElement = document.getElementById('error');
 
-      // Si hay parámetro 'next', regresar a la página original
-      const params = new URLSearchParams(window.location.search);
-      const next = params.get("next");
-      if (next) {
-        window.location.replace(next);
-      } else {
-        window.location.replace("panel.html");
-      }
-    } catch (err) {
-      // Fallback mínimo
-      window.location.href = "panel.html";
+  try {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      throw error;
     }
-  } else {
-    document.getElementById("error").classList.remove("hidden");
+
+    // Si el login es exitoso, Supabase guarda la sesión.
+    // Redirigir al panel de administración.
+    window.location.replace('panel.html');
+
+  } catch (error) {
+    console.error('Error en el inicio de sesión:', error.message);
+    errorElement.textContent = 'Email o contraseña incorrecta.';
+    errorElement.classList.remove('hidden');
   }
 });

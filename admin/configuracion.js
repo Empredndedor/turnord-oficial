@@ -1,12 +1,24 @@
 // configuracion.js
-import { supabase } from '../database.js'; // database.js está en la misma carpeta
+import { supabase } from '../database.js';
 
-const negocioId = 'barberia0001';
 const root = document.documentElement;
+let negocioId; // Se obtendrá del usuario autenticado
 
+async function getNegocioId() {
+  if (negocioId) return negocioId;
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user && user.user_metadata && user.user_metadata.negocio_id) {
+    negocioId = user.user_metadata.negocio_id;
+    return negocioId;
+  }
+  // Si no se encuentra el negocio_id, redirigir o mostrar error
+  alert('No se pudo obtener el ID del negocio. Por favor, inicie sesión de nuevo.');
+  window.location.replace('login.html');
+  return null;
+}
 
 function aplicarTema(themePrimary, themeMode) {
-  const colors = ['red','orange','blue','black','green','pink','purple'];
+  const colors = ['red', 'orange', 'blue', 'black', 'green', 'pink', 'purple'];
   colors.forEach(c => root.classList.remove('theme-' + c));
   root.classList.add('theme-' + themePrimary);
   root.classList.toggle('dark', themeMode === 'dark');
@@ -15,21 +27,22 @@ function aplicarTema(themePrimary, themeMode) {
   localStorage.setItem('theme_mode', themeMode);
 }
 
-
-
 // Cargar configuración desde Supabase
 async function cargarConfig() {
+  const currentNegocioId = await getNegocioId();
+  if (!currentNegocioId) return;
+
   try {
     const { data, error } = await supabase
       .from('configuracion_negocio')
-      .select('theme_primary, theme_mode')
-      .eq('negocio_id', negocioId)
+      .select('ajustes') // Seleccionamos la columna 'ajustes' que contiene el tema
+      .eq('negocio_id', currentNegocioId)
       .maybeSingle();
 
     if (error) throw error;
 
-    const themePrimary = data?.theme_primary || localStorage.getItem('theme_primary') || 'blue';
-    const themeMode    = data?.theme_mode    || localStorage.getItem('theme_mode')    || 'light';
+    const themePrimary = data?.ajustes?.theme_primary || localStorage.getItem('theme_primary') || 'blue';
+    const themeMode = data?.ajustes?.theme_mode || localStorage.getItem('theme_mode') || 'light';
 
     document.getElementById('theme-primary').value = themePrimary;
     document.getElementById('theme-mode').value = themeMode;
@@ -42,15 +55,21 @@ async function cargarConfig() {
 
 // Guardar configuración en Supabase
 async function guardarConfig() {
+  const currentNegocioId = await getNegocioId();
+  if (!currentNegocioId) return;
+
   const theme_primary = document.getElementById('theme-primary').value;
-  const theme_mode    = document.getElementById('theme-mode').value;
+  const theme_mode = document.getElementById('theme-mode').value;
 
   try {
     const { error } = await supabase
       .from('configuracion_negocio')
       .upsert(
-        { negocio_id: negocioId, theme_primary, theme_mode },
-        { onConflict: 'negocio_id' } // asegúrate que negocio_id sea UNIQUE
+        {
+          negocio_id: currentNegocioId,
+          ajustes: { theme_primary, theme_mode }
+        },
+        { onConflict: 'negocio_id' }
       );
 
     if (error) throw error;
@@ -76,4 +95,3 @@ document.getElementById('theme-toggle')?.addEventListener('click', () => {
 
 // Cargar configuración al iniciar
 document.addEventListener('DOMContentLoaded', cargarConfig);
-

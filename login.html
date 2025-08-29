@@ -10,7 +10,7 @@
   <link rel="apple-touch-icon" href="./imegenlogin/apple-touch-icon.png" />
   <link rel="shortcut icon" href="./imegenlogin/favicon.ico" type="image/x-icon"/>
 
-  <script src="admin/login.js" defer></script>
+  <script type="module" src="admin/login.js" defer></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     // Inicializar modo oscuro
@@ -45,19 +45,15 @@
     <h2 class="text-2xl font-bold mb-6 text-center dark:text-white">Iniciar Sesión</h2>
     <form id="loginForm" class="space-y-4">
       <div>
-        <label for="username" class="block mb-1 dark:text-gray-200">Usuario</label>
+        <label for="email" class="block mb-1 dark:text-gray-200">Email</label>
         <input
-          type="text"
-          id="username"
-          name="username"
+          type="email"
+          id="email"
+          name="email"
           class="w-full border px-3 py-2 rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-          pattern="[A-Za-z0-9]{4,20}"
-          maxlength="20"
           required
-          oninvalid="this.setCustomValidity('El usuario debe tener entre 4 y 20 caracteres, solo letras y números')"
-          oninput="this.setCustomValidity('')"
-          autocomplete="username"
-          placeholder="Usuario"
+          autocomplete="email"
+          placeholder="Email"
         >
       </div>
       <div>
