@@ -75,26 +75,26 @@ CREATE POLICY cierres_delete ON public.cierres_caja
 
 
 -- =============================
--- Table: negocio_config
+-- Table: configuracion_negocio
 -- =============================
-ALTER TABLE public.negocio_config ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.configuracion_negocio ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "Enable all operations for negocio_config" ON public.negocio_config;
+DROP POLICY IF EXISTS "Enable all operations for configuracion_negocio" ON public.configuracion_negocio;
 
-DROP POLICY IF EXISTS negocio_config_select ON public.negocio_config;
-CREATE POLICY negocio_config_select ON public.negocio_config
+DROP POLICY IF EXISTS configuracion_negocio_select ON public.configuracion_negocio;
+CREATE POLICY configuracion_negocio_select ON public.configuracion_negocio
   FOR SELECT USING (negocio_id = auth.get_negocio_id());
 
-DROP POLICY IF EXISTS negocio_config_insert ON public.negocio_config;
-CREATE POLICY negocio_config_insert ON public.negocio_config
+DROP POLICY IF EXISTS configuracion_negocio_insert ON public.configuracion_negocio;
+CREATE POLICY configuracion_negocio_insert ON public.configuracion_negocio
   FOR INSERT WITH CHECK (negocio_id = auth.get_negocio_id());
 
-DROP POLICY IF EXISTS negocio_config_update ON public.negocio_config;
-CREATE POLICY negocio_config_update ON public.negocio_config
+DROP POLICY IF EXISTS configuracion_negocio_update ON public.configuracion_negocio;
+CREATE POLICY configuracion_negocio_update ON public.configuracion_negocio
   FOR UPDATE USING (negocio_id = auth.get_negocio_id());
 
-DROP POLICY IF EXISTS negocio_config_delete ON public.negocio_config;
-CREATE POLICY negocio_config_delete ON public.negocio_config
+DROP POLICY IF EXISTS configuracion_negocio_delete ON public.configuracion_negocio;
+CREATE POLICY configuracion_negocio_delete ON public.configuracion_negocio
   FOR DELETE USING (negocio_id = auth.get_negocio_id());
 
 

@@ -392,26 +392,37 @@ document.querySelectorAll('aside nav a').forEach(link => {
 </script>
 <script type="module">
   import { supabase } from './database.js';
-  const negocioId = 'barberia0001';
-  try {
-    const { data } = await supabase
-      .from('configuracion_negocio')
-      .select('theme_primary, theme_mode')
-      .eq('negocio_id', negocioId)
-      .maybeSingle();
-    if (data) {
-      if (data.theme_primary) localStorage.setItem('theme_primary', data.theme_primary);
-      if (data.theme_mode) localStorage.setItem('theme_mode', data.theme_mode);
-      if (window.theme && window.theme.apply) {
-        window.theme.apply(
-          data.theme_primary || localStorage.getItem('theme_primary') || 'blue',
-          data.theme_mode || localStorage.getItem('theme_mode') || 'light'
-        );
-      }
+
+  async function applyThemeFromDB() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user || !user.user_metadata || !user.user_metadata.negocio_id) {
+      // No hay usuario o negocio_id, no se puede cargar el tema
+      return;
     }
-  } catch (e) {
-    console.warn('No se pudo sincronizar tema desde DB', e);
+    const negocioId = user.user_metadata.negocio_id;
+
+    try {
+      const { data } = await supabase
+        .from('configuracion_negocio')
+        .select('ajustes')
+        .eq('negocio_id', negocioId)
+        .maybeSingle();
+
+      if (data && data.ajustes) {
+        const { theme_primary, theme_mode } = data.ajustes;
+        if (theme_primary) localStorage.setItem('theme_primary', theme_primary);
+        if (theme_mode) localStorage.setItem('theme_mode', theme_mode);
+
+        if (window.theme && window.theme.apply) {
+          window.theme.apply(theme_primary, theme_mode);
+        }
+      }
+    } catch (e) {
+      console.warn('No se pudo sincronizar tema desde DB', e);
+    }
   }
+
+  applyThemeFromDB();
 </script>
 
 </body>

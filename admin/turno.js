@@ -140,77 +140,16 @@ function initThemeToggle() {
   const themeToggle = document.getElementById('theme-toggle');
   const htmlElement = document.documentElement;
   
-  // Verificar preferencia guardada
-// Función para verificar si una fecha es día laboral
-async function verificarDiaLaboralFecha(fecha = new Date()) {
-  try {
-    const { data, error } = await supabase
-      .from('configuracion_negocio')
-      .select('dias_operacion')
-      .eq('negocio_id', negocioId)
-      .single();
-
-    if (error) {
-      console.warn('No se pudo verificar configuración de días laborales:', error);
-      return true; // Permitir por defecto si no hay configuración
-    }
-
-    if (!data || !Array.isArray(data.dias_operacion) || data.dias_operacion.length === 0) {
-      return false; // No hay días configurados
-    }
-
-    const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-    const diaFecha = diasSemana[fecha.getDay()];
-    
-    return data.dias_operacion.includes(diaFecha);
-  } catch (error) {
-    console.error('Error al verificar día laboral:', error);
-    return true; // Permitir por defecto en caso de error
-  }
-}
-
-// Modificar la función tomarTurno para incluir validación de día laboral
-async function tomarTurno(event) {
-  event.preventDefault();
-  console.log("tomarTurno llamada");
-
-  // Asegurar configuración al día (incluye dias_operacion)
-  await cargarHoraLimite();
-
-  // Validar día operacional
-  const esDiaLaboral = await verificarDiaLaboralFecha(new Date());
-  if (!esDiaLaboral) {
-    mostrarNotificacion('Hoy no es un día laboral. No se pueden tomar turnos en este día.', 'error');
-    return;
+  const savedTheme = localStorage.getItem('theme');
+  if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+    htmlElement.classList.add('dark');
+  } else {
+    htmlElement.classList.remove('dark');
   }
 
-  // ... existing code ...
-}
-
-// Cargar tema guardado
-const savedTheme = localStorage.getItem('theme');
-if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-  htmlElement.classList.add('dark');
-} else {
-  htmlElement.classList.remove('dark');
-}
-
-themeToggle?.addEventListener('click', () => {
-  htmlElement.classList.toggle('dark');
-  const isDark = htmlElement.classList.contains('dark');// ... existing code ...
-
-// Suscripción a cambios de servicios
-supabase
-  .channel('servicios-turno')
-  .on(
-    'postgres_changes',
-    { event: '*', schema: 'public', table: 'servicios', filter: `negocio_id=eq.${negocioId}` },
-    async () => {
-      await cargarServicios();
-    }
-  )
-  .subscribe();
-
+  themeToggle?.addEventListener('click', () => {
+    htmlElement.classList.toggle('dark');
+    const isDark = htmlElement.classList.contains('dark');
     localStorage.setItem('theme', isDark ? 'dark' : 'light');
   });
 }
@@ -224,7 +163,6 @@ function iniciarActualizadorMinutos() {
 
 function actualizarMinuteros() {
   try {
-    // Actualizar 'Esperando' en tarjetas
     const spans = document.querySelectorAll('.esperando-min');
     const ahora = Date.now();
     spans.forEach(sp => {
@@ -235,7 +173,6 @@ function actualizarMinuteros() {
       sp.textContent = String(mins);
     });
 
-    // Actualizar 'En atención' si aplica
     const tEst = document.getElementById('tiempo-estimado');
     if (tEst && tEst.dataset && tEst.dataset.startedIso) {
       const inicio = new Date(tEst.dataset.startedIso);
@@ -245,7 +182,6 @@ function actualizarMinuteros() {
       }
     }
   } catch (e) {
-    // evitar romper el bucle
     console.warn('Error actualizando minuteros', e);
   }
 }
@@ -264,7 +200,6 @@ function actualizarFechaHora() {
 
 // Días operacionales helpers
 function getDiaOperacionIndex(date = new Date()) {
-  // JS: 0=Domingo, 1=Lunes ... 6=Sábado
   return date.getDay();
 }
 function esDiaOperativo(date = new Date()) {
@@ -276,21 +211,17 @@ function esDiaOperativo(date = new Date()) {
 // Tomar turno manual desde el modal
 async function tomarTurno(event) {
   event.preventDefault();
-  console.log("tomarTurno llamada");
 
-  // Asegurar configuración al día (incluye dias_operacion)
   await cargarHoraLimite();
 
-  // Validar día operacional
   if (!esDiaOperativo(new Date())) {
     mostrarNotificacion('Hoy no es un día operacional.', 'error');
     return;
   }
 
-  // Validar horario de apertura y cierre
   const ahora = new Date();
   const horaActual = ahora.toTimeString().slice(0,5);
-  const horaStr = ahora.toLocaleTimeString('es-ES', { hour12: false });  // formato 24h "HH:mm:ss"
+  const horaStr = ahora.toLocaleTimeString('es-ES', { hour12: false });
   if (horaActual < HORA_APERTURA) {
     mostrarNotificacion(`Aún no hemos abierto. Horario: ${HORA_APERTURA} - ${HORA_LIMITE_TURNOS}`, 'error');
     return;
@@ -314,7 +245,6 @@ async function tomarTurno(event) {
 
   const servicio = document.getElementById('servicio').value;
 
-  // Verificar límite de turnos del día
   const fechaHoy = new Date().toISOString().slice(0, 10);
   const { count: totalHoy, error: countError } = await supabase
     .from('turnos')
@@ -332,7 +262,6 @@ async function tomarTurno(event) {
 
   const turnoGenerado = await generarNuevoTurno();
 
-  // Verificación de unicidad para evitar turnos duplicados por condiciones de carrera
   let nuevoTurno = turnoGenerado;
   try {
     while (true) {
@@ -377,9 +306,7 @@ async function tomarTurno(event) {
 
 // Calcular tiempo de espera estimado basado en el servicio
 function calcularTiempoEsperaEstimado(servicio) {
-  // Si hay catálogo cargado, úsalo
   if (serviciosCache && serviciosCache[servicio]) return serviciosCache[servicio];
-  // Fallback si no hay catálogo
   const tiemposServicio = {
     'Barbería': 30,
     'Corte de cabello': 20,
@@ -389,12 +316,10 @@ function calcularTiempoEsperaEstimado(servicio) {
   return tiemposServicio[servicio] || 25;
 }
 
-// Calcular tiempo estimado total considerando todos los servicios en cola
 async function calcularTiempoEstimadoTotal(turnoObjetivo = null) {
   const hoy = new Date().toISOString().slice(0, 10);
   let tiempoTotal = 0;
 
-  // 1) Obtener tiempo restante del turno en atención
   try {
     const { data: enAtencion } = await supabase
       .from('turnos')
@@ -421,7 +346,6 @@ async function calcularTiempoEstimadoTotal(turnoObjetivo = null) {
     console.warn('Error calculando tiempo de atención:', error);
   }
 
-  // 2) Obtener cola de espera y sumar tiempos de servicios
   try {
     const { data: cola } = await supabase
       .from('turnos')
@@ -432,7 +356,6 @@ async function calcularTiempoEstimadoTotal(turnoObjetivo = null) {
       .order('created_at', { ascending: true });
 
     if (cola && cola.length) {
-      // Si se especifica un turno objetivo, solo sumar hasta ese turno
       const limite = turnoObjetivo ? 
         cola.findIndex(t => t.turno === turnoObjetivo) : 
         cola.length;
@@ -451,22 +374,19 @@ async function calcularTiempoEstimadoTotal(turnoObjetivo = null) {
   return tiempoTotal;
 }
 
-// Función para obtener la letra del día basada en la fecha
 function obtenerLetraDelDia() {
   const hoy = new Date();
-  const fechaBase = new Date('2024-08-23'); // Fecha base donde A = día 0
+  const fechaBase = new Date('2024-08-23');
   const diferenciaDias = Math.floor((hoy - fechaBase) / (1000 * 60 * 60 * 24));
-  const indiceDia = diferenciaDias % 26; // Ciclo de 26 letras (A-Z)
-  const letra = String.fromCharCode(65 + Math.abs(indiceDia)); // 65 = 'A'
+  const indiceDia = diferenciaDias % 26;
+  const letra = String.fromCharCode(65 + Math.abs(indiceDia));
   return letra;
 }
 
-// Generar el próximo turno disponible
 async function generarNuevoTurno() {
   const letraHoy = obtenerLetraDelDia();
   const fechaHoy = new Date().toISOString().slice(0, 10);
   
-  // Buscar el último turno del día actual con la letra correspondiente
   const { data, error } = await supabase
     .from('turnos')
     .select('turno')
@@ -488,17 +408,12 @@ async function generarNuevoTurno() {
   const ultimo = data[0].turno;
   const numero = parseInt(ultimo.substring(1)) + 1;
   const nuevoTurno = `${letraHoy}${numero.toString().padStart(2, '0')}`;
-  console.log("Nuevo turno generado:", nuevoTurno);
   return nuevoTurno;
 }
 
-// Cargar turnos en espera
 async function cargarTurnos() {
-  console.log("cargarTurnos llamada");
-
   const hoy = new Date().toISOString().slice(0, 10);
 
-  // Buscar si hay un turno actualmente en atención
   const { data: enAtencion, error: errAt } = await supabase
     .from('turnos')
     .select('*')
@@ -508,7 +423,6 @@ async function cargarTurnos() {
     .order('started_at', { ascending: true })
     .limit(1);
 
-  // Cargar cola de espera
   const { data, error } = await supabase
     .from('turnos')
     .select('*')
@@ -523,7 +437,6 @@ async function cargarTurnos() {
     return;
   }
 
-  // Deduplicar por código de turno (evita mostrar dos filas con el mismo código)
   const listaOriginal = data || [];
   const seenTurnos = new Set();
   const dataRender = [];
@@ -542,7 +455,6 @@ async function cargarTurnos() {
   
   lista.innerHTML = '';
   
-  // Actualizar contador
   if (contadorEspera) {
     contadorEspera.textContent = `${dataRender.length} turno${dataRender.length !== 1 ? 's' : ''}`;
   }
@@ -551,33 +463,27 @@ async function cargarTurnos() {
     turnosEsperaElement.textContent = dataRender.length;
   }
   
-  // Actualizar barra de progreso
   const cargaEspera = document.getElementById('carga-espera');
   if (cargaEspera) {
-    // Calcular porcentaje de carga (máximo 100% a partir de 10 turnos)
     const porcentaje = Math.min(dataRender.length * 10, 100);
     cargaEspera.style.width = `${porcentaje}%`;
   }
 
-  // Mostrar mensaje si no hay turnos
   if (dataRender.length === 0 && sinTurnos) {
     sinTurnos.classList.remove('hidden');
   } else if (sinTurnos) {
     sinTurnos.classList.add('hidden');
   }
 
-  // Crear tarjetas de turnos con tiempo estimado mejorado
   for (let index = 0; index < dataRender.length; index++) {
     const t = dataRender[index];
     const div = document.createElement('div');
     div.className = 'bg-blue-50 dark:bg-blue-900/30 p-4 rounded-lg shadow-sm border border-blue-100 dark:border-blue-800 transition-all hover:shadow-md';
     
-    // Calcular tiempo de espera real (desde creación)
     const horaCreacion = new Date(`${t.fecha}T${t.hora}`);
     const ahora = new Date();
     const minutosEsperaReal = Math.floor((ahora - horaCreacion) / 60000);
     
-    // Calcular tiempo estimado hasta que le toque (basado en servicios)
     const tiempoEstimadoHasta = await calcularTiempoEstimadoTotal(t.turno);
     
     div.innerHTML = `
@@ -598,10 +504,8 @@ async function cargarTurnos() {
     lista.appendChild(div);
   }
 
-  // Determinar turno actual: en atención si existe, si no el primero en espera
   turnoActual = (enAtencion && enAtencion.length > 0) ? enAtencion[0] : (dataRender.length > 0 ? dataRender[0] : null);
 
-  // Actualizar información del turno actual
   document.getElementById('turnoActual').textContent = turnoActual ? turnoActual.turno : '--';
 
   const clienteActual = document.getElementById('cliente-actual');
@@ -613,7 +517,6 @@ async function cargarTurnos() {
   if (tiempoEstimado) {
     if (turnoActual) {
       if (turnoActual.estado === 'En atención') {
-        // Mostrar que está en atención actualmente
         const inicio = turnoActual.started_at ? new Date(turnoActual.started_at) : null;
         if (inicio) {
           const trans = Math.max(0, Math.floor((Date.now() - inicio.getTime()) / 60000));
@@ -624,7 +527,6 @@ async function cargarTurnos() {
           tiempoEstimado.textContent = `En atención`;
         }
       } else {
-        // Estimado por servicio
         const mins = (serviciosCache && serviciosCache[turnoActual.servicio]) ? serviciosCache[turnoActual.servicio] : 25;
         delete tiempoEstimado.dataset.startedIso;
         tiempoEstimado.textContent = `${mins} min`;
@@ -635,17 +537,9 @@ async function cargarTurnos() {
     }
   }
   
-  if (turnoActual) {
-    console.log(`Turno actual: ${turnoActual.turno} (id: ${turnoActual.id || 's/n'})`, turnoActual);
-  } else {
-    console.log("Turno actual: --");
-  }
-  
-  // Calcular tiempo promedio de espera mejorado
   if (dataRender.length > 0) {
     const tiempoPromedio = document.getElementById('tiempo-promedio');
     if (tiempoPromedio) {
-      // Calcular el tiempo total acumulado de todos los servicios en cola
       const tiempoTotalCola = await calcularTiempoEstimadoTotal();
       const promedio = dataRender.length > 0 ? tiempoTotalCola / dataRender.length : 0;
       tiempoPromedio.textContent = `${Math.round(promedio)} min`;
@@ -653,11 +547,9 @@ async function cargarTurnos() {
   }
 }
 
-// Cargar estadísticas para el gráfico
 async function cargarEstadisticas() {
   const hoy = new Date().toISOString().slice(0, 10);
   
-  // Obtener turnos atendidos hoy
   const { data: turnosAtendidos, error: errorAtendidos } = await supabase
     .from('turnos')
     .select('*')
@@ -670,7 +562,6 @@ async function cargarEstadisticas() {
     return;
   }
   
-  // Obtener turnos devueltos hoy
   const { data: turnosDevueltos, error: errorDevueltos } = await supabase
     .from('turnos')
     .select('*')
@@ -683,42 +574,35 @@ async function cargarEstadisticas() {
     return;
   }
   
-  // Actualizar contador de turnos atendidos
   const turnosAtendidosElement = document.getElementById('turnos-atendidos');
   if (turnosAtendidosElement) {
     turnosAtendidosElement.textContent = turnosAtendidos.length;
   }
   
-  // Calcular ingresos totales
   const ingresos = turnosAtendidos.reduce((total, turno) => total + (turno.monto_cobrado || 0), 0);
   const ingresosHoy = document.getElementById('ingresos-hoy');
   if (ingresosHoy) {
     ingresosHoy.textContent = `RD$${ingresos.toFixed(2)}`;
   }
   
-  // Calcular promedio de cobro
   const promedioCobro = document.getElementById('promedio-cobro');
   if (promedioCobro && turnosAtendidos.length > 0) {
     const promedio = ingresos / turnosAtendidos.length;
     promedioCobro.textContent = `RD$${promedio.toFixed(2)}`;
   }
   
-  // Crear gráfico de estadísticas
   const ctx = document.getElementById('estadisticasChart');
   if (!ctx) return;
   
-  // Agrupar turnos por hora
   const turnosPorHora = {};
   const horasDelDia = [];
   
-  // Inicializar horas del día (de 8 AM a 8 PM)
   for (let i = 8; i <= 20; i++) {
     const hora = i < 10 ? `0${i}:00` : `${i}:00`;
     horasDelDia.push(hora);
     turnosPorHora[hora] = { atendidos: 0, devueltos: 0, espera: 0 };
   }
   
-  // Contar turnos atendidos por hora
   turnosAtendidos.forEach(turno => {
     const hora = turno.hora.slice(0, 5);
     const horaRedondeada = `${hora.slice(0, 2)}:00`;
@@ -727,7 +611,6 @@ async function cargarEstadisticas() {
     }
   });
   
-  // Contar turnos devueltos por hora
   turnosDevueltos.forEach(turno => {
     const hora = turno.hora.slice(0, 5);
     const horaRedondeada = `${hora.slice(0, 2)}:00`;
@@ -736,7 +619,6 @@ async function cargarEstadisticas() {
     }
   });
   
-  // Obtener turnos en espera
   const { data: turnosEspera, error: errorEspera } = await supabase
     .from('turnos')
     .select('*')
@@ -754,17 +636,14 @@ async function cargarEstadisticas() {
     });
   }
   
-  // Preparar datos para el gráfico
   const datosAtendidos = horasDelDia.map(hora => turnosPorHora[hora].atendidos);
   const datosDevueltos = horasDelDia.map(hora => turnosPorHora[hora].devueltos);
   const datosEspera = horasDelDia.map(hora => turnosPorHora[hora].espera);
   
-  // Destruir gráfico existente si hay uno
   if (chart) {
     chart.destroy();
   }
   
-  // Crear nuevo gráfico
   chart = new Chart(ctx, {
     type: 'bar',
     data: {
@@ -832,16 +711,13 @@ async function cargarEstadisticas() {
   });
 }
 
-// Suscripción en tiempo real a cambios en turnos
 let canalTurnos = null;
 
 function suscribirseTurnos() {
-  // Desconectar canal existente si existe
   if (canalTurnos) {
     supabase.removeChannel(canalTurnos);
   }
   
-  // Crear nueva suscripción
   canalTurnos = supabase
     .channel('turnos-admin')
     .on(
@@ -854,24 +730,19 @@ function suscribirseTurnos() {
     .subscribe();
 }
 
-// Modal para tomar turno
 function abrirModal() {
-  console.log("abrirModal llamada");
   document.getElementById('modal').classList.remove('hidden');
   document.getElementById('modal').classList.add('flex');
   document.getElementById('nombre').focus();
 }
 
 function cerrarModal() {
-  console.log("cerrarModal llamada");
   document.getElementById('modal').classList.add('hidden');
   document.getElementById('modal').classList.remove('flex');
   document.getElementById('formTurno').reset();
 }
 
-// Modal de cobro
 function abrirModalCobro() {
-  console.log("abrirModalCobro llamada");
   if (!turnoActual) {
     mostrarNotificacion('No hay turno en espera.', 'warning');
     return;
@@ -882,13 +753,11 @@ function abrirModalCobro() {
 }
 
 function cerrarModalCobro() {
-  console.log("cerrarModalCobro llamada");
   document.getElementById('modalCobro').classList.add('hidden');
   document.getElementById('modalCobro').classList.remove('flex');
   document.getElementById('formCobro').reset();
 }
 
-// Atender ahora
 async function atenderAhora() {
   if (!turnoActual) {
     mostrarNotificacion('No hay turno en espera.', 'warning');
@@ -907,10 +776,8 @@ async function atenderAhora() {
   refrescarUI();
 }
 
-// Guardar el cobro e indicar que el turno fue atendido
 async function guardarCobro(event) {
   event.preventDefault();
-  console.log("guardarCobro llamada");
 
   const monto = parseFloat(document.getElementById('montoCobrado').value);
   if (!turnoActual) return;
@@ -934,9 +801,7 @@ async function guardarCobro(event) {
   refrescarUI();
 }
 
-// Devolver turno al final de la cola
 async function devolverTurno() {
-  console.log("devolverTurno llamada");
   if (!turnoActual) {
     mostrarNotificacion('No hay turno que devolver.', 'warning');
     return;
@@ -946,10 +811,6 @@ async function devolverTurno() {
     return;
   }
 
-  const ahoraISO = new Date().toISOString();
-
-  // Mantener 'En espera' y actualizar created_at para mandarlo al final
-  // mover al final: orden = MAX(orden)+1 para hoy
   const hoy = new Date().toISOString().slice(0, 10);
   const { data: maxData, error: maxErr } = await supabase
     .from('turnos')
@@ -979,7 +840,6 @@ async function devolverTurno() {
   refrescarUI();
 }
 
-// Función para mostrar notificaciones con SweetAlert2
 function mostrarNotificacion(mensaje, tipo = 'info') {
   const iconos = {
     success: 'success',
@@ -1004,7 +864,6 @@ function mostrarNotificacion(mensaje, tipo = 'info') {
   });
 }
 
-// Exportar funciones para uso en HTML
 window.tomarTurno = tomarTurno;
 window.abrirModal = abrirModal;
 window.cerrarModal = cerrarModal;

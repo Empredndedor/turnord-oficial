@@ -325,7 +325,7 @@ async function cargarConfiguracion() {
       }
 
       if (data.dias_operacion && Array.isArray(data.dias_operacion)) {
-        const dayNumToName = { 'Domingo': 0, 'Lunes': 1, 'Martes': 2, 'Miércoles': 3, 'Miercoles': 3, 'Jueves': 4, 'Viernes': 5, 'Sábado': 6, 'Sabado': 6 };
+        const dayNameToNum = { 'Domingo': 0, 'Lunes': 1, 'Martes': 2, 'Miércoles': 3, 'Jueves': 4, 'Viernes': 5, 'Sábado': 6 };
         const selectedDays = data.dias_operacion
           .map(name => dayNumToName[name])
           .filter(n => typeof n === 'number' && !Number.isNaN(n));
@@ -360,11 +360,11 @@ async function guardarConfiguracion(event) {
 
     const dayNumToName = { 0: 'Domingo', 1: 'Lunes', 2: 'Martes', 3: 'Miércoles', 4: 'Jueves', 5: 'Viernes', 6: 'Sábado' };
     const diasOperacion = [];
-    document.querySelectorAll('.day-btn').forEach(button => {
-      if (button.classList.contains('bg-blue-500')) {
-        const dn = parseInt(button.getAttribute('data-day'));
-        if (!Number.isNaN(dn) && dayNumToName[dn]) diasOperacion.push(dayNumToName[dn]);
-      }
+    document.querySelectorAll('.day-btn.bg-blue-500').forEach(button => {
+        const dayIndex = parseInt(button.getAttribute('data-day'), 10);
+        if (dayNumToName[dayIndex]) {
+            diasOperacion.push(dayNumToName[dayIndex]);
+        }
     });
 
     // Validación: al menos un día seleccionado

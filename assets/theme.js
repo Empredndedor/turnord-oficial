@@ -9,10 +9,12 @@
   .theme-red    { --color-primary-500:#ef4444; --color-primary-600:#dc2626; --color-primary-700:#b91c1c; }
   .theme-orange { --color-primary-500:#f97316; --color-primary-600:#ea580c; --color-primary-700:#c2410c; }
   .theme-blue   { --color-primary-500:#0ea5e9; --color-primary-600:#0284c7; --color-primary-700:#0369a1; }
-  .theme-black  { --color-primary-500:#334155; --color-primary-600:#1f2937; --color-primary-700:#0f172a; }
   .theme-green  { --color-primary-500:#22c55e; --color-primary-600:#16a34a; --color-primary-700:#15803d; }
   .theme-pink   { --color-primary-500:#ec4899; --color-primary-600:#db2777; --color-primary-700:#be185d; }
   .theme-purple { --color-primary-500:#8b5cf6; --color-primary-600:#7c3aed; --color-primary-700:#6d28d9; }
+  .theme-indigo { --color-primary-500:#6366f1; --color-primary-600:#4f46e5; --color-primary-700:#4338ca; }
+  .theme-teal   { --color-primary-500:#14b8a6; --color-primary-600:#0d9488; --color-primary-700:#0f766e; }
+  .theme-cyan   { --color-primary-500:#06b6d4; --color-primary-600:#0891b2; --color-primary-700:#0e7490; }
 
   /* Ejemplos de utilitarios opcionales basados en variables */
   .text-primary-500 { color: var(--color-primary-500); }
@@ -63,7 +65,7 @@
   }
 
   function removeThemeClasses(root) {
-    var themes = ['theme-red','theme-orange','theme-blue','theme-black','theme-green','theme-pink','theme-purple'];
+    var themes = ['theme-red','theme-orange','theme-blue','theme-green','theme-pink','theme-purple', 'theme-indigo', 'theme-teal', 'theme-cyan'];
     themes.forEach(function(c){ root.classList.remove(c); });
   }
 

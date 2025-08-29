@@ -6,7 +6,7 @@ import Config from './admin/config.js';
 const config = Config.getSupabaseConfig();
 
 if (!config.url || !config.key) {
-  throw new Error('Configuración de Supabase no encontrada');
+  throw new Error('Configuración de Supabase no encontrada. Asegúrate de que el archivo admin/config.js existe y es correcto.');
 }
 
 export const supabase = createClient(config.url, config.key);

@@ -5,18 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Negocio - TurnoRD</title>
   <script type="module" src="auth-guard.js"></script>
-  <script>
-    // Aplica tema desde localStorage lo antes posible
-    (function () {
-      var primary = localStorage.getItem('theme_primary') || 'blue';
-      var mode    = localStorage.getItem('theme_mode')    || 'light';
-      var root = document.documentElement;
-      var themes = ['theme-red','theme-orange','theme-blue','theme-black','theme-green','theme-pink','theme-purple'];
-      themes.forEach(function(c){ root.classList.remove(c); });
-      root.classList.add('theme-' + primary);
-      if (mode === 'dark') root.classList.add('dark'); else root.classList.remove('dark');
-    })();
-  </script>
   <script src="assets/theme.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -397,28 +385,36 @@
   <script type="module" src="./admin/negocio.js"></script>
   <script type="module">
     import { supabase } from './database.js';
-    const negocioId = 'barberia0001';
-    (async () => {
+
+    async function applyThemeFromDB() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || !user.user_metadata || !user.user_metadata.negocio_id) {
+        return;
+      }
+      const negocioId = user.user_metadata.negocio_id;
+
       try {
         const { data } = await supabase
           .from('configuracion_negocio')
-          .select('theme_primary, theme_mode')
+          .select('ajustes')
           .eq('negocio_id', negocioId)
           .maybeSingle();
-        if (data) {
-          if (data.theme_primary) localStorage.setItem('theme_primary', data.theme_primary);
-          if (data.theme_mode) localStorage.setItem('theme_mode', data.theme_mode);
+
+        if (data && data.ajustes) {
+          const { theme_primary, theme_mode } = data.ajustes;
+          if (theme_primary) localStorage.setItem('theme_primary', theme_primary);
+          if (theme_mode) localStorage.setItem('theme_mode', theme_mode);
+
           if (window.theme && window.theme.apply) {
-            window.theme.apply(
-              data.theme_primary || localStorage.getItem('theme_primary') || 'blue',
-              data.theme_mode || localStorage.getItem('theme_mode') || 'light'
-            );
+            window.theme.apply(theme_primary, theme_mode);
           }
         }
       } catch (e) {
         console.warn('No se pudo sincronizar tema desde DB', e);
       }
-    })();
+    }
+
+    applyThemeFromDB();
 
     async function cargarServicios() {
       const { data, error } = await supabase
