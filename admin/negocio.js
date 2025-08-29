@@ -1,6 +1,18 @@
 import { supabase } from '../database.js';
 
-const negocioId = 'barberia0001';
+let negocioId; // Se obtendrá del usuario autenticado
+
+async function getNegocioId() {
+  if (negocioId) return negocioId;
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user && user.user_metadata && user.user_metadata.negocio_id) {
+    negocioId = user.user_metadata.negocio_id;
+    return negocioId;
+  }
+  alert('No se pudo obtener el ID del negocio. Por favor, inicie sesión de nuevo.');
+  window.location.replace('login.html');
+  return null;
+}
 
 // Variables para el control de break
 let breakActivo = false;
@@ -8,7 +20,10 @@ let breakEndTime = null;
 let breakInterval = null;
 
 // Inicialización cuando el DOM está cargado
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+  await getNegocioId();
+  if (!negocioId) return;
+
   initThemeToggle();
   actualizarFechaHora();
   setInterval(actualizarFechaHora, 60000); // Actualizar cada minuto
@@ -310,9 +325,9 @@ async function cargarConfiguracion() {
       }
 
       if (data.dias_operacion && Array.isArray(data.dias_operacion)) {
-        const dayNameToNum = { 'Domingo': 0, 'Lunes': 1, 'Martes': 2, 'Miércoles': 3, 'Miercoles': 3, 'Jueves': 4, 'Viernes': 5, 'Sábado': 6, 'Sabado': 6 };
+        const dayNumToName = { 'Domingo': 0, 'Lunes': 1, 'Martes': 2, 'Miércoles': 3, 'Miercoles': 3, 'Jueves': 4, 'Viernes': 5, 'Sábado': 6, 'Sabado': 6 };
         const selectedDays = data.dias_operacion
-          .map(name => dayNameToNum[name])
+          .map(name => dayNumToName[name])
           .filter(n => typeof n === 'number' && !Number.isNaN(n));
 
         const dayButtons = document.querySelectorAll('.day-btn');

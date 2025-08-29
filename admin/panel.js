@@ -1,8 +1,20 @@
 // panel.js
 import { supabase } from '../database.js';
 
+let negocioId; // Se obtendrá del usuario autenticado
 
-const negocioId = 'barberia0001';
+async function getNegocioId() {
+  if (negocioId) return negocioId;
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user && user.user_metadata && user.user_metadata.negocio_id) {
+    negocioId = user.user_metadata.negocio_id;
+    return negocioId;
+  }
+  alert('No se pudo obtener el ID del negocio. Por favor, inicie sesión de nuevo.');
+  window.location.replace('login.html');
+  return null;
+}
+
 
 // Utilidad: fecha local YYYY-MM-DD
 function ymdLocal(dateLike) {
@@ -57,13 +69,16 @@ function ymdUTC(dateLike) {
 
 // Función para cargar datos y actualizar vista, devuelve los turnos del día
 async function cargarDatos() {
+  const currentNegocioId = await getNegocioId();
+  if (!currentNegocioId) return;
+
   try {
     const hoyLocal = ymdLocal(new Date());
     const hoyUTC = ymdUTC(new Date());
     const { data, error } = await supabase
       .from('turnos')
       .select('*')
-      .eq('negocio_id', negocioId)
+      .eq('negocio_id', currentNegocioId)
       .or(`fecha.eq.${hoyUTC},fecha.eq.${hoyLocal}`)
       .order('created_at', { ascending: false });
 
@@ -93,6 +108,9 @@ async function cargarDatos() {
 
 // Función para limpiar historial del día actual
 async function limpiarHistorialTurnos() {
+    const currentNegocioId = await getNegocioId();
+    if (!currentNegocioId) return;
+
   if (!confirm('¿Estás seguro que quieres limpiar el historial del día?')) return;
 
   const btn = document.getElementById('btnLimpiarHistorial');
@@ -110,7 +128,7 @@ async function limpiarHistorialTurnos() {
     const { error: deleteError } = await supabase
       .from('turnos')
       .delete()
-      .eq('negocio_id', negocioId)
+      .eq('negocio_id', currentNegocioId)
       .or(`fecha.eq.${hoyUTC},fecha.eq.${hoyLocal}`);
 
     if (deleteError) throw deleteError;
@@ -134,7 +152,10 @@ async function limpiarHistorialTurnos() {
 }
 
 // Suscripción en tiempo real para actualizar datos al instante
-function suscribirseTurnos() {
+async function suscribirseTurnos() {
+    const currentNegocioId = await getNegocioId();
+    if (!currentNegocioId) return;
+
   supabase
     .channel('canal-turnos')
     .on(
@@ -143,7 +164,7 @@ function suscribirseTurnos() {
         event: '*',
         schema: 'public',
         table: 'turnos',
-        filter: `negocio_id=eq.${negocioId}`,
+        filter: `negocio_id=eq.${currentNegocioId}`,
       },
       async payload => {
         console.log('🟢 Actualización en tiempo real:', payload);
@@ -167,7 +188,8 @@ function resaltarMenu() {
 }
 
 // Inicialización al cargar la página
-window.addEventListener('DOMContentLoaded', () => {
+window.addEventListener('DOMContentLoaded', async () => {
+  await getNegocioId();
   resaltarMenu();
   cargarDatos();
   suscribirseTurnos();

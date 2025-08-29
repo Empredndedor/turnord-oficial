@@ -1,6 +1,19 @@
 import { supabase } from '../database.js';
 
-const negocioId = 'barberia0001';
+let negocioId; // Se obtendrá del usuario autenticado
+
+async function getNegocioId() {
+  if (negocioId) return negocioId;
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user && user.user_metadata && user.user_metadata.negocio_id) {
+    negocioId = user.user_metadata.negocio_id;
+    return negocioId;
+  }
+  alert('No se pudo obtener el ID del negocio. Por favor, inicie sesión de nuevo.');
+  window.location.replace('login.html');
+  return null;
+}
+
 let turnoActual = null;
 let HORA_APERTURA = "08:00"; // valor por defecto
 let HORA_LIMITE_TURNOS = "23:00"; // valor por defecto
@@ -64,6 +77,8 @@ async function cargarHoraLimite() {
 
 // Inicialización cuando el DOM está listo
 document.addEventListener('DOMContentLoaded', async () => {
+    await getNegocioId();
+    if (!negocioId) return;
   // Inicializar modo oscuro
   initThemeToggle();
   
@@ -196,8 +211,6 @@ supabase
   )
   .subscribe();
 
-// ... existing code ...SUPABASE_URL=https://fhequkvqxsbdkmgmoftp.supabase.co
-SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZoZXF1a3ZxeHNiZGttZ21vZnRwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM5MTM3NzAsImV4cCI6MjA2OTQ4OTc3MH0.tVXmyBG39oxWJVlmFwHXAaYDBWxakssZ7g-BywmlZEM
     localStorage.setItem('theme', isDark ? 'dark' : 'light');
   });
 }
