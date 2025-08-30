@@ -1,12 +1,8 @@
 // database.js - Versión corregida
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
-// Importamos las credenciales desde el nuevo archivo config.js
-import { supabaseUrl, supabaseAnonKey } from './config.js';
-
-// Verificamos que las credenciales se hayan cargado correctamente
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('La URL o la llave de Supabase no se encontraron en config.js');
-}
+// Credenciales de Supabase
+const supabaseUrl = "https://fhequkvqxsbdkmgmoftp.supabase.co"
+const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZoZXF1a3ZxeHNiZGttZ21vZnRwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM5MTM3NzAsImV4cCI6MjA2OTQ4OTc3MH0.tVXmyBG39oxWJVlmFwHXAaYDBWxakssZ7g-BywmlZEM"
 
 // Creamos y exportamos el cliente de Supabase para que esté disponible en toda la aplicación
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
