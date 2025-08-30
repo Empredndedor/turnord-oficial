@@ -1,5 +1,5 @@
 // database.js - Versión corregida
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
 // Importamos las credenciales desde el nuevo archivo config.js
 import { supabaseUrl, supabaseAnonKey } from './config.js';
 
