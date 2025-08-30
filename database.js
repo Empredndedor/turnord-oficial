@@ -1,6 +1,6 @@
 // database.js - Versión segura
 import { createClient } from 'https://esm.sh/@supabase/supabase-js';
-import Config from './admin/config.js';
+import Config from './admin/configuracion.js';
 
 // Obtener configuración de forma segura
 const config = Config.getSupabaseConfig();
