@@ -68,7 +68,6 @@ function cerrarModal() {
   const modal = document.getElementById('modal');
   if (modal) modal.classList.add('hidden');
 }
-window.cerrarModal = cerrarModal;
 
 // Conversión HH:MM a minutos totales
 function hhmmToMinutes(hhmm) {
@@ -582,6 +581,14 @@ window.addEventListener('DOMContentLoaded', async () => {
   const fechaElem = document.getElementById('fecha-de-hoy');
   const btnTomarTurno = document.querySelector('button[onclick*="modal"]');
   const form = document.getElementById('formRegistroNegocio');
+  const btnCerrarModal = document.getElementById('btn-cerrar-modal');
+
+  // Event listener para cerrar el modal
+  if (btnCerrarModal) {
+    btnCerrarModal.addEventListener('click', () => {
+      cerrarModal();
+    });
+  }
 
   // Estado de break inicial
   const estadoBreakInicial = await verificarBreakNegocio();

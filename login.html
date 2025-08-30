@@ -78,11 +78,6 @@
   </div>
 
   <script>
-    // Validación en tiempo real para el usuario (solo letras y números)
-    document.getElementById('username').addEventListener('input', function() {
-      this.value = this.value.replace(/[^A-Za-z0-9]/g, '');
-    });
-
     // Función para alternar modo oscuro
     document.getElementById('toggleDarkMode').addEventListener('click', function() {
       const modoOscuro = !document.documentElement.classList.contains('dark');
