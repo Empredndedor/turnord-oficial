@@ -1,23 +1,31 @@
-// database.js - Versión segura
+// database.js - Versión corregida
 import { createClient } from 'https://esm.sh/@supabase/supabase-js';
-import Config from './admin/config.js';
+// Importamos las credenciales desde el nuevo archivo config.js
+import { supabaseUrl, supabaseAnonKey } from './config.js';
 
-// Obtener configuración de forma segura
-const config = Config.getSupabaseConfig();
-
-if (!config.url || !config.key) {
-  throw new Error('Configuración de Supabase no encontrada');
+// Verificamos que las credenciales se hayan cargado correctamente
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error('La URL o la llave de Supabase no se encontraron en config.js');
 }
 
-export const supabase = createClient(config.url, config.key);
+// Creamos y exportamos el cliente de Supabase para que esté disponible en toda la aplicación
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// Función para verificar conexión
+// Función (opcional) para verificar la conexión, puede ser útil para depurar
 export async function testConnection() {
   try {
-    const { data, error } = await supabase.from('turnos').select('count').limit(1);
-    return !error;
+    // Intentamos hacer una consulta simple a la tabla 'turnos'
+    const { data, error } = await supabase.from('turnos').select('id').limit(1);
+
+    if (error) {
+        console.error('Error en la consulta de prueba a Supabase:', error);
+        return false;
+    }
+
+    console.log('Conexión con Supabase verificada con éxito.');
+    return true;
   } catch (e) {
-    console.error('Error de conexión:', e);
+    console.error('Error de conexión con Supabase:', e);
     return false;
   }
 }
