@@ -1,5 +1,5 @@
 // config.js
-const Config = {
+export const Config = {
   supabaseUrl: 'TU_SUPABASE_URL', // Reemplazado por GitHub Actions
   supabaseKey: 'TU_SUPABASE_KEY', // Reemplazado por GitHub Actions
 
