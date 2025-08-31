@@ -1,5 +1,5 @@
 // database.js
-import * as supabasePkg from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.38.4/+esm';
+import * as supabasePkg from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.53.0/+esm';
 import Config from './config.js';
 
 // Extraemos createClient del paquete
