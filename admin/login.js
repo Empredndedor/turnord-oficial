@@ -19,6 +19,17 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
       throw error;
     }
 
+    // Asignar el negocio_id al usuario después del login exitoso
+    if (data.user) {
+      const { error: updateError } = await supabase.auth.updateUser({
+        data: { negocio_id: 'barberia0001' }
+      });
+      
+      if (updateError) {
+        console.warn('No se pudo actualizar el negocio_id:', updateError.message);
+      }
+    }
+
     // Si el login es exitoso, Supabase guarda la sesión.
     // Redirigir al panel de administración.
     window.location.replace('panel.html');
@@ -29,3 +40,4 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
     errorElement.classList.remove('hidden');
   }
 });
+
