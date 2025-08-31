@@ -1,13 +1,11 @@
-// database.js
-import * as supabasePkg from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.38.4/+esm';
-import Config from './config.js';
+// database.js - Versión corregida
+import { createClient } from 'https://esm.sh/@supabase/supabase-js';
+// Importamos las credenciales desde el nuevo archivo config.js
+import { supabaseUrl, supabaseAnonKey } from './config.js';
 
-// Extraemos createClient del paquete
-const { createClient } = supabasePkg;
-
-// Validación por si no se carga correctamente
-if (!createClient) {
-  console.error('Error: No se pudo importar createClient desde supabase-js. Verifica la URL del CDN.');
+// Verificamos que las credenciales se hayan cargado correctamente
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error('La URL o la llave de Supabase no se encontraron en config.js');
 }
 
 // Obtenemos la configuración (URL y clave)
