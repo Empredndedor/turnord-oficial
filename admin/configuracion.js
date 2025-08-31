@@ -1,5 +1,6 @@
 // configuracion.js
 import { supabase } from '../database.js';
+import Config from '../config.js';
 
 const root = document.documentElement;
 let negocioId; // Se obtendrá del usuario autenticado
@@ -13,7 +14,7 @@ async function getNegocioId() {
   }
   // Si no se encuentra el negocio_id, redirigir o mostrar error
   alert('No se pudo obtener el ID del negocio. Por favor, inicie sesión de nuevo.');
-  window.location.replace('login.html');
+  window.location.replace(Config.getRoute('login'));
   return null;
 }
 

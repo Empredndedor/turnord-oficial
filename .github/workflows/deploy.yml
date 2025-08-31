@@ -19,8 +19,25 @@ jobs:
 
       - name: Replace Supabase credentials
         run: |
+          # Reemplazar las variables de configuración en config.js
           sed -i "s|TU_SUPABASE_URL|${{ secrets.SUPABASE_URL }}|g" config.js
           sed -i "s|TU_SUPABASE_KEY|${{ secrets.SUPABASE_ANON_KEY }}|g" config.js
+          
+          # Verificar que los reemplazos se hicieron correctamente
+          echo "Verificando configuración..."
+          if grep -q "TU_SUPABASE_URL" config.js; then
+            echo "⚠️ ADVERTENCIA: SUPABASE_URL no fue reemplazada"
+            echo "Asegúrate de configurar el secret SUPABASE_URL en GitHub"
+          else
+            echo "✅ SUPABASE_URL configurada correctamente"
+          fi
+          
+          if grep -q "TU_SUPABASE_KEY" config.js; then
+            echo "⚠️ ADVERTENCIA: SUPABASE_ANON_KEY no fue reemplazada"
+            echo "Asegúrate de configurar el secret SUPABASE_ANON_KEY en GitHub"
+          else
+            echo "✅ SUPABASE_ANON_KEY configurada correctamente"
+          fi
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3

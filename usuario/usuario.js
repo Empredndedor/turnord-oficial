@@ -1,20 +1,22 @@
 // usuario.js
 import { supabase } from '../database.js';
+import Config from '../config.js';
 
-// Identificador de negocio
-const negocioId = 'barberia0001';
+// Configuración centralizada del negocio
+const negocioConfig = Config.getNegocioConfig();
+const negocioId = negocioConfig.id;
 
 // Estado en memoria/localStorage
 let turnoAsignado = null;
 let intervaloContador = null;
 let telefonoUsuario = localStorage.getItem('telefonoUsuario') || null;
 
-// Cache de configuración
-let HORA_LIMITE_TURNOS = '23:00';
+// Cache de configuración desde config.js
+let HORA_LIMITE_TURNOS = negocioConfig.configuracion.hora_limite_turnos;
 let configCache = {
-  hora_apertura: '08:00',
-  hora_cierre: '23:00',
-  limite_turnos: 50
+  hora_apertura: negocioConfig.configuracion.hora_apertura,
+  hora_cierre: negocioConfig.configuracion.hora_cierre,
+  limite_turnos: negocioConfig.configuracion.limite_turnos
 };
 
 // Persistencia del deadline del turno para que el contador continúe al volver a la pestaña

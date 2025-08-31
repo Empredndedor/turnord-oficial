@@ -1,13 +1,16 @@
+
 // database.js
+
 import * as supabasePkg from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.53.0/+esm';
+
 import Config from './config.js';
 
-// Extraemos createClient del paquete
-const { createClient } = supabasePkg;
+// Importamos createClient desde la URL del CDN configurada centralmente
+import { createClient } from Config.getCDN('supabase');
 
 // Validación por si no se carga correctamente
 if (!createClient) {
-  console.error('Error: No se pudo importar createClient desde supabase-js. Verifica la URL del CDN.');
+  console.error('Error: No se pudo importar createClient desde supabase-js. Verifica la configuración del CDN en config.js.');
 }
 
 // Obtenemos la configuración (URL y clave)
@@ -33,4 +36,3 @@ export async function testConnection() {
     return false;
   }
 }
-
