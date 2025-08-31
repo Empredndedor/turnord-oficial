@@ -65,7 +65,7 @@ inicializarModoOscuro();
 
   <!-- Inicializar Supabase -->
   <script type="module">
-    import Config from './js/confi.js';
+    import { Config } from './config.js';
     const { url, key } = Config.getSupabaseConfig();
     const supabase = window.supabase.createClient(url, key);
     console.log('Supabase listo:', supabase);
@@ -84,4 +84,3 @@ inicializarModoOscuro();
 
 </body>
 </html>
-
