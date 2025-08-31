@@ -91,7 +91,7 @@
 <!-- Supabase -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script type="module">
-  import Config from 'js/confi.js';
+  import Config from './config.js';
   const { url, key } = Config.getSupabaseConfig();
   const supabase = window.supabase.createClient(url, key);
 </script>
