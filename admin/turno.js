@@ -513,8 +513,7 @@ async function cargarTurnos() {
     .eq('estado', 'En atención')
     .eq('negocio_id', negocioId)
     .eq('fecha', hoy)
-    .order('started_at', { ascending: true })
-    .limit(1);
+    .order('started_at', { ascending: true });
 
 
   // Cargar cola de espera
@@ -608,26 +607,49 @@ async function cargarTurnos() {
     lista.appendChild(div);
   }
 
-  // Determinar turno actual: en atención si existe, si no el primero en espera
-  turnoActual = (enAtencion && enAtencion.length > 0) ? enAtencion[0] : (dataRender.length > 0 ? dataRender[0] : null);
+  // Renderizar la lista de turnos en atención
+  const listaAtencion = document.getElementById('listaAtencion');
+  if (listaAtencion) {
+    listaAtencion.innerHTML = '';
+    (enAtencion || []).forEach(t => {
+      const div = document.createElement('div');
+      div.className = 'bg-green-50 dark:bg-green-900/30 p-4 rounded-lg shadow-sm border border-green-100 dark:border-green-800 transition-all';
+      div.innerHTML = `
+        <div class="flex justify-between items-start">
+          <span class="text-2xl font-bold text-green-700 dark:text-green-400">${t.turno}</span>
+          <span class="text-xs bg-green-200 dark:bg-green-800 text-green-800 dark:text-green-200 px-2 py-0.5 rounded-full">Atendiendo</span>
+        </div>
+        <p class="text-gray-700 dark:text-gray-300 font-medium mt-2 truncate">${t.nombre || 'Cliente'}</p>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">${t.servicio || 'Servicio'}</p>
+      `;
+      listaAtencion.appendChild(div);
+    });
+  }
 
-  // Actualizar información del turno actual
-  document.getElementById('turnoActual').textContent = turnoActual ? turnoActual.turno : '--';
+  // Determinar turno actual para el display principal (el último en atención)
+  const turnoActualDisplay = (enAtencion && enAtencion.length > 0) ? enAtencion[enAtencion.length - 1] : null;
+
+  // Determinar el próximo turno para las acciones de los botones (el primero en espera)
+  turnoActual = (dataRender.length > 0) ? dataRender[0] : null;
+
+  // Actualizar información del turno actual en el display principal
+  document.getElementById('turnoActual').textContent = turnoActualDisplay ? turnoActualDisplay.turno : (turnoActual ? turnoActual.turno : '--');
 
   const clienteActual = document.getElementById('cliente-actual');
   if (clienteActual) {
-    clienteActual.textContent = turnoActual ? turnoActual.nombre : '-';
+    clienteActual.textContent = turnoActualDisplay ? turnoActualDisplay.nombre : (turnoActual ? turnoActual.nombre : '-');
   }
 
   const tiempoEstimado = document.getElementById('tiempo-estimado');
   if (tiempoEstimado) {
-    if (turnoActual) {
-      if (turnoActual.estado === 'En atención') {
+    const turnoParaEstimar = turnoActualDisplay || turnoActual;
+    if (turnoParaEstimar) {
+      if (turnoParaEstimar.estado === 'En atención') {
         // Mostrar que está en atención actualmente
-        const inicio = turnoActual.started_at ? new Date(turnoActual.started_at) : null;
+        const inicio = turnoParaEstimar.started_at ? new Date(turnoParaEstimar.started_at) : null;
         if (inicio) {
           const trans = Math.max(0, Math.floor((Date.now() - inicio.getTime()) / 60000));
-          tiempoEstimado.dataset.startedIso = turnoActual.started_at;
+          tiempoEstimado.dataset.startedIso = turnoParaEstimar.started_at;
           tiempoEstimado.textContent = `En atención · ${trans} min`;
         } else {
           tiempoEstimado.dataset.startedIso = '';
@@ -635,7 +657,7 @@ async function cargarTurnos() {
         }
       } else {
         // Estimado por servicio
-        const mins = (serviciosCache && serviciosCache[turnoActual.servicio]) ? serviciosCache[turnoActual.servicio] : 25;
+        const mins = (serviciosCache && serviciosCache[turnoParaEstimar.servicio]) ? serviciosCache[turnoParaEstimar.servicio] : 25;
         delete tiempoEstimado.dataset.startedIso;
         tiempoEstimado.textContent = `${mins} min`;
       }
@@ -646,9 +668,9 @@ async function cargarTurnos() {
   }
   
   if (turnoActual) {
-    console.log(`Turno actual: ${turnoActual.turno} (id: ${turnoActual.id || 's/n'})`, turnoActual);
+    console.log(`Próximo turno para acciones: ${turnoActual.turno} (id: ${turnoActual.id || 's/n'})`, turnoActual);
   } else {
-    console.log("Turno actual: --");
+    console.log("No hay turnos en espera para acciones.");
   }
   
   // Calcular tiempo promedio de espera mejorado
