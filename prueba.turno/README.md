@@ -1,6 +1,6 @@
 # Proyecto de Sistema de Turnos
 
-Este proyecto es una aplicación web para la gestión de turnos, diseñada para funcionar como una demo desplegada en GitHub Pages.
+Este proyecto es una aplicación web para la gestión de turnos.
 
 ## Arquitectura
 
@@ -8,19 +8,7 @@ La aplicación está construida con HTML, CSS y JavaScript "vanilla". Utiliza Su
 
 ## Configuración
 
-Para que la aplicación se conecte a tu instancia de Supabase, las credenciales se gestionan a través del archivo `config.js`. Este archivo contiene valores de marcador de posición (`TU_SUPABASE_URL` y `TU_SUPABASE_KEY`) que deben ser reemplazados por tus credenciales reales de Supabase durante el despliegue.
-
-## Despliegue en GitHub Pages
-
-Este proyecto está pensado para ser desplegado fácilmente en GitHub Pages. Para que el despliegue funcione correctamente con tus credenciales de Supabase de forma segura, es crucial configurar los "Secrets" de tu repositorio de GitHub.
-
-1.  **Ve a tu repositorio en GitHub.**
-2.  **Navega a `Settings` > `Secrets and variables` > `Actions`.**
-3.  **Crea dos nuevos "Repository secrets":**
-    *   `SUPABASE_URL`: Pega aquí la URL de tu proyecto de Supabase.
-    *   `SUPABASE_KEY`: Pega aquí tu clave `anon` (pública) de Supabase.
-
-Un flujo de trabajo de GitHub Actions (que deberás configurar) puede usar estos secretos para reemplazar los marcadores de posición en `config.js` de forma segura antes de publicar el sitio en GitHub Pages.
+La aplicación se conecta a Supabase mediante las credenciales configuradas directamente en el archivo `config.js`. Las credenciales de Supabase ya están incluidas en este archivo para facilitar la conexión inmediata con la base de datos.
 
 ## Proceso de Build
 

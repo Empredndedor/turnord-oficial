@@ -1,8 +1,8 @@
-// config.js - Configuración centralizada para GitHub Pages
+// config.js - Configuración centralizada
 const Config = {
   // === CONFIGURACIÓN DE SUPABASE ===
-  supabaseUrl: 'TU_SUPABASE_URL', // Reemplazado por GitHub Actions
-  supabaseKey: 'TU_SUPABASE_KEY', // Reemplazado por GitHub Actions
+  supabaseUrl: 'https://fhequkvqxsbdkmgmoftp.supabase.co', // superbase url
+  supabaseKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZoZXF1a3ZxeHNiZGttZ21vZnRwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM5MTM3NzAsImV4cCI6MjA2OTQ4OTc3MH0.tVXmyBG39oxWJVlmFwHXAaYDBWxakssZ7g-BywmlZEM', // superbase llave
 
   // === CONFIGURACIÓN DEL NEGOCIO ===
   negocio: {
@@ -30,22 +30,13 @@ const Config = {
     tailwind: 'https://cdn.tailwindcss.com'
   },
 
-  // === CONFIGURACIÓN DE GITHUB PAGES ===
-  github: {
-    isGitHubPages: window.location.hostname.includes('github.io'),
-    basePath: window.location.hostname.includes('github.io') ? 
-      `/${window.location.pathname.split('/')[1]}` : ''
-  },
+  // === CONFIGURACIÓN DE RUTAS BASE ===
+  basePath: '',
 
   // === MÉTODOS DE CONFIGURACIÓN ===
   getSupabaseConfig: function() {
     const url = this.supabaseUrl;
     const key = this.supabaseKey;
-
-    if (url === 'TU_SUPABASE_URL' || key === 'TU_SUPABASE_KEY') {
-      console.warn('Advertencia: Las credenciales de Supabase no han sido reemplazadas.');
-    }
-
     return { url, key };
   },
 
@@ -54,9 +45,8 @@ const Config = {
   },
 
   getRoute: function(routeName) {
-    const basePath = this.github.basePath;
     const route = this.routes[routeName] || routeName;
-    return this.github.isGitHubPages ? `${basePath}/${route}` : route;
+    return route;
   },
 
   getCDN: function(service) {
@@ -70,7 +60,7 @@ const Config = {
       negocio: this.getNegocioConfig(),
       routes: this.routes,
       cdn: this.cdn,
-      github: this.github
+      basePath: this.basePath
     };
   }
 };

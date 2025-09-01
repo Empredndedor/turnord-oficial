@@ -1,10 +1,4 @@
-# Variables de entorno
-.env
-.env.local
-.env.production
-
-# Archivos de configuración sensibles
-secrets.js
+# Archivos temporales
 
 # Logs
 *.log
