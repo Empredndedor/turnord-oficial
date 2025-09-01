@@ -3,13 +3,9 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Bienvenido</title>
+<title>Bienvenido a TurnoRD</title>
 
 <!-- Base dinámico -->
-
-<script src="config.js"></script>
-<script src="database.js"></script>
-
 <script>
   const isGitHub = location.hostname.includes('github.io');
   const baseHref = isGitHub ? '/turnord-oficial/' : '';
@@ -19,11 +15,11 @@
 </script>
 
 <!-- Favicons -->
-<link rel="icon" type="image/x-icon" href="prueba.turno/imegenlogin/favicon.ico" />
-<link rel="icon" type="image/png" sizes="16x16" href="prueba.turno/imegenlogin/favicon-16x16.png" />
-<link rel="icon" type="image/png" sizes="32x32" href="prueba.turno/imegenlogin/favicon-32x32.png" />
-<link rel="apple-touch-icon" sizes="180x180" href="prueba.turno/imegenlogin/apple-touch-icon.png">
-<link rel="manifest" href="prueba.turno/imegenlogin/site.webmanifest">
+<link rel="icon" type="image/x-icon" href="imegenlogin/favicon.ico" />
+<link rel="icon" type="image/png" sizes="16x16" href="imegenlogin/favicon-16x16.png" />
+<link rel="icon" type="image/png" sizes="32x32" href="imegenlogin/favicon-32x32.png" />
+<link rel="apple-touch-icon" sizes="180x180" href="imegenlogin/apple-touch-icon.png">
+<link rel="manifest" href="imegenlogin/site.webmanifest">
 
 <!-- Tailwind CSS -->
 <script src="https://cdn.tailwindcss.com"></script>
@@ -59,21 +55,10 @@ inicializarModoOscuro();
     <p class="text-base sm:text-lg mb-2"><strong>Raudy Barbershop y Sport</strong></p>
     <p class="text-base sm:text-lg mb-6">Gestiona tus turnos de manera fácil y rápida.</p>
 
-    <a href="prueba.turno/usuario.html" class="bg-white dark:bg-gray-200 text-blue-900 dark:text-blue-800 font-semibold px-6 py-3 rounded-xl shadow-lg hover:bg-gray-100 dark:hover:bg-gray-300 transition block w-full sm:w-auto mx-auto">
+    <a href="usuario.html" class="bg-white dark:bg-gray-200 text-blue-900 dark:text-blue-800 font-semibold px-6 py-3 rounded-xl shadow-lg hover:bg-gray-100 dark:hover:bg-gray-300 transition block w-full sm:w-auto mx-auto">
       Ver turnos
     </a>
   </section>
-
-  <!-- Supabase JS -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-  <!-- Inicializar Supabase -->
-  <script type="module">
-    import Config from './config.js';
-    const { url, key } = Config.getSupabaseConfig();
-    const supabase = window.supabase.createClient(url, key);
-    console.log('Supabase listo:', supabase);
-  </script>
 
   <!-- Script modo oscuro -->
   <script>
@@ -88,4 +73,3 @@ inicializarModoOscuro();
 
 </body>
 </html>
-
