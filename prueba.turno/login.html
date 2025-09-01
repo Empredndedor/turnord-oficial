@@ -4,7 +4,14 @@
   <meta charset="UTF-8">
   <title>Iniciar Sesión - TurnoRD</title>
 
-  <base href="/turnord-oficial/">
+  <!-- Base dinámico -->
+<script>
+  const isGitHub = location.hostname.includes('github.io');
+  const baseHref = isGitHub ? '/turnord-oficial/' : '';
+  const base = document.createElement('base');
+  base.href = baseHref;
+  document.head.appendChild(base);
+</script>
 
   <link rel="icon" type="image/x-icon" href="./imegenlogin/favicon.ico" />
   <link rel="icon" type="image/x-icon" href="./imegenlogin/favicon-16x16.png" sizes="16x16" />

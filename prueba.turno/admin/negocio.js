@@ -1,5 +1,5 @@
-import { supabase } from '../database.js';
-import Config from '../config.js';
+import { supabase } from '../../database.js';
+import Config from '../../config.js';
 
 let negocioId; // Se obtendrá del usuario autenticado
 

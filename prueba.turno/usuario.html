@@ -5,8 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>TurnORD - Usuario</title>
 
-<!-- Base para GitHub Pages -->
-<base href="/turnord-oficial/">
+<!-- Base dinámico -->
+<script>
+  const isGitHub = location.hostname.includes('github.io');
+  const baseHref = isGitHub ? '/turnord-oficial/' : '';
+  const base = document.createElement('base');
+  base.href = baseHref;
+  document.head.appendChild(base);
+</script>
 
 <!-- Favicons -->
 <link rel="icon" type="image/x-icon" href="imegenlogin/favicon.ico" />
@@ -47,7 +53,7 @@
   <p class="text-sm text-gray-500 dark:text-gray-400 mb-8" id="fecha-de-hoy"></p>
 
   <div class="bg-gray-100 dark:bg-gray-700 text-blue-900 dark:text-blue-200 p-6 rounded-xl mb-6 shadow-inner">
-    <div class="text-4xl font-bold" id="turno-actual">A00</div>
+    <div class="text-4xl font-bold" id="turno-actual">00</div>
     <div class="text-sm mt-2 font-medium">TURNO ACTUAL</div>
     <div class="text-lg font-semibold mt-4"><span id="conteo-turno">0</span> EN ESPERA</div>
   </div>

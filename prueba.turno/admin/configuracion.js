@@ -1,6 +1,6 @@
 // configuracion.js
-import { supabase } from '../database.js';
-import Config from '../config.js';
+import { supabase } from '../../database.js';
+import Config from '../../config.js';
 
 const root = document.documentElement;
 let negocioId; // Se obtendrá del usuario autenticado

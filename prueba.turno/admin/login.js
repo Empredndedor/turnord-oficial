@@ -1,7 +1,7 @@
 // Se importa el cliente de Supabase desde el archivo de configuración central (database.js).
 // Esto asegura que toda la aplicación utiliza la misma conexión segura.
-import { supabase } from '../database.js';
-import Config from '../config.js';
+import { supabase } from '../../database.js';
+import Config from '../../config.js';
 
 document.getElementById('loginForm').addEventListener('submit', async (e) => {
   e.preventDefault();

@@ -1,4 +1,4 @@
-import { supabase } from '../database.js';
+import { supabase } from '../../database.js';
 
 let negocioId; // Se obtendrá del usuario autenticado
 
