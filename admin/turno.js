@@ -25,6 +25,7 @@ async function getNegocioId() {
 }
 
 let turnoActual = null;
+let dataRender = []; // Cache of waiting list turns for reordering
 let HORA_APERTURA = "08:00"; // valor por defecto
 let HORA_LIMITE_TURNOS = "23:00"; // valor por defecto
 let LIMITE_TURNOS = 50; // valor por defecto
@@ -113,6 +114,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Configurar menú móvil
   const mobileMenuButton = document.getElementById('mobile-menu-button');
   const sidebar = document.getElementById('sidebar');
+
+  // Listener para reordenar turnos
+  document.getElementById('listaEspera')?.addEventListener('click', handleReorderClick);
   const overlay = document.getElementById('sidebar-overlay');
   
   mobileMenuButton?.addEventListener('click', toggleMobileMenu);
@@ -144,6 +148,45 @@ document.addEventListener('DOMContentLoaded', async () => {
     .subscribe();
 
   });
+
+// Handler para los botones de reordenar
+async function handleReorderClick(event) {
+    const button = event.target.closest('.btn-subir, .btn-bajar');
+    if (!button) return;
+
+    const isSubir = button.classList.contains('btn-subir');
+    const turnId = button.dataset.id;
+
+    const currentIndex = dataRender.findIndex(t => t.id == turnId);
+    if (currentIndex === -1) return;
+
+    const otherIndex = isSubir ? currentIndex - 1 : currentIndex + 1;
+    if (otherIndex < 0 || otherIndex >= dataRender.length) return;
+
+    const currentTurn = dataRender[currentIndex];
+    const otherTurn = dataRender[otherIndex];
+
+    if (!confirm(`¿Seguro que quieres mover el turno ${currentTurn.turno}?`)) return;
+
+    // Intercambiar los valores de 'orden'
+    const updates = [
+        supabase.from('turnos').update({ orden: otherTurn.orden }).eq('id', currentTurn.id),
+        supabase.from('turnos').update({ orden: currentTurn.orden }).eq('id', otherTurn.id)
+    ];
+
+    try {
+        const results = await Promise.all(updates);
+        const hasError = results.some(res => res.error);
+        if (hasError) {
+            throw new Error('Una de las actualizaciones falló.');
+        }
+        mostrarNotificacion('Turnos reordenados con éxito.', 'success');
+        await refrescarUI();
+    } catch (error) {
+        console.error('Error al reordenar turnos:', error);
+        mostrarNotificacion('Error al reordenar los turnos.', 'error');
+    }
+}
 
 // Función para inicializar el toggle de tema oscuro/claro
 function initThemeToggle() {
@@ -535,7 +578,7 @@ async function cargarTurnos() {
   // Deduplicar por código de turno (evita mostrar dos filas con el mismo código)
   const listaOriginal = data || [];
   const seenTurnos = new Set();
-  const dataRender = [];
+  dataRender = []; // Clear and rebuild the cache
   for (const t of listaOriginal) {
     if (!t || !t.turno) continue;
     if (!seenTurnos.has(t.turno)) {
@@ -601,6 +644,14 @@ async function cargarTurnos() {
           <span class="text-xs text-gray-500 dark:text-gray-400 block">Esperando: <span class="esperando-min" data-creado-iso="${t.fecha}T${t.hora}">${minutosEsperaReal}</span> min</span>
           <span class="text-xs text-blue-600 dark:text-blue-400 font-medium">ETA: ${tiempoEstimadoHasta} min</span>
         </div>
+      </div>
+      <div class="mt-2 flex justify-end space-x-2">
+        <button class="btn-subir p-1 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-full disabled:opacity-50" data-id="${t.id}" data-orden="${t.orden}" ${index === 0 ? 'disabled' : ''}>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path></svg>
+        </button>
+        <button class="btn-bajar p-1 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-full disabled:opacity-50" data-id="${t.id}" data-orden="${t.orden}" ${index === dataRender.length - 1 ? 'disabled' : ''}>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7 7"></path></svg>
+        </button>
       </div>
     `;
     
