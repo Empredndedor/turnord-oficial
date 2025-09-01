@@ -1,6 +1,6 @@
 // usuario.js
-import { supabase } from '../../database.js';
-import Config from '../../config.js';
+import { supabase } from '../database.js';
+import Config from '../config.js';
 
 // Configuración centralizada del negocio
 const negocioConfig = Config.getNegocioConfig();
