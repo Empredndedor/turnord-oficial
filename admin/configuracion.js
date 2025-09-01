@@ -1,98 +1,58 @@
 // configuracion.js
-import { supabase } from '../database.js';
-import Config from '../config.js';
 
-const root = document.documentElement;
-let negocioId; // Se obtendrá del usuario autenticado
+// Nota: La lógica de Supabase ha sido eliminada.
+// El tema se maneja ahora 100% en el lado del cliente usando localStorage
+// a través del helper global `window.theme` que viene de `assets/theme.js`.
 
-async function getNegocioId() {
-  if (negocioId) return negocioId;
-  const { data: { user } } = await supabase.auth.getUser();
-  if (user && user.user_metadata && user.user_metadata.negocio_id) {
-    negocioId = user.user_metadata.negocio_id;
-    return negocioId;
+function setupThemePage() {
+  const themePrimarySelect = document.getElementById('theme-primary');
+  const themeModeSelect = document.getElementById('theme-mode');
+  const saveButton = document.getElementById('btn-guardar');
+  const statusEl = document.getElementById('status');
+  const themeToggleBtn = document.getElementById('theme-toggle');
+
+  if (!themePrimarySelect || !themeModeSelect || !saveButton || !statusEl) {
+    console.error('No se encontraron todos los elementos de configuración del tema.');
+    return;
   }
-  // Si no se encuentra el negocio_id, redirigir o mostrar error
-  alert('No se pudo obtener el ID del negocio. Por favor, inicie sesión de nuevo.');
-  window.location.replace(Config.getRoute('login'));
-  return null;
+
+  // 1. Cargar la configuración guardada en localStorage al iniciar
+  const currentTheme = window.theme.get();
+  themePrimarySelect.value = currentTheme.primary;
+  themeModeSelect.value = currentTheme.mode;
+
+  // 2. Implementar la vista previa en vivo
+  themePrimarySelect.addEventListener('change', () => {
+    window.theme.setPrimary(themePrimarySelect.value);
+  });
+
+  themeModeSelect.addEventListener('change', () => {
+    window.theme.setMode(themeModeSelect.value);
+  });
+
+  // 3. El botón de guardar ahora solo da feedback, ya que los cambios se aplican y guardan al instante.
+  saveButton.addEventListener('click', () => {
+    statusEl.textContent = 'Guardado ✅';
+    setTimeout(() => {
+      statusEl.textContent = '';
+    }, 2000);
+  });
+
+  // 4. Sincronizar el botón de toggle principal con el select
+  themeToggleBtn?.addEventListener('click', () => {
+      // Damos un pequeño delay para asegurar que theme.js actualice el localStorage primero
+      setTimeout(() => {
+        const currentMode = window.theme.get().mode;
+        themeModeSelect.value = currentMode;
+      }, 50);
+  });
 }
 
-function aplicarTema(themePrimary, themeMode) {
-  const colors = ['red', 'orange', 'blue', 'black', 'green', 'pink', 'purple'];
-  colors.forEach(c => root.classList.remove('theme-' + c));
-  root.classList.add('theme-' + themePrimary);
-  root.classList.toggle('dark', themeMode === 'dark');
-
-  localStorage.setItem('theme_primary', themePrimary);
-  localStorage.setItem('theme_mode', themeMode);
+// Cargar la configuración de la página cuando el DOM esté listo.
+// El helper `window.theme` de `assets/theme.js` se carga antes que este script,
+// por lo que debería estar disponible.
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setupThemePage);
+} else {
+    setupThemePage();
 }
-
-// Cargar configuración desde Supabase
-async function cargarConfig() {
-  const currentNegocioId = await getNegocioId();
-  if (!currentNegocioId) return;
-
-  try {
-    const { data, error } = await supabase
-      .from('configuracion_negocio')
-      .select('ajustes') // Seleccionamos la columna 'ajustes' que contiene el tema
-      .eq('negocio_id', currentNegocioId)
-      .maybeSingle();
-
-    if (error) throw error;
-
-    const themePrimary = data?.ajustes?.theme_primary || localStorage.getItem('theme_primary') || 'blue';
-    const themeMode = data?.ajustes?.theme_mode || localStorage.getItem('theme_mode') || 'light';
-
-    document.getElementById('theme-primary').value = themePrimary;
-    document.getElementById('theme-mode').value = themeMode;
-
-    aplicarTema(themePrimary, themeMode);
-  } catch (err) {
-    console.error('Error al cargar configuración:', err.message || err);
-  }
-}
-
-// Guardar configuración en Supabase
-async function guardarConfig() {
-  const currentNegocioId = await getNegocioId();
-  if (!currentNegocioId) return;
-
-  const theme_primary = document.getElementById('theme-primary').value;
-  const theme_mode = document.getElementById('theme-mode').value;
-
-  try {
-    const { error } = await supabase
-      .from('configuracion_negocio')
-      .upsert(
-        {
-          negocio_id: currentNegocioId,
-          ajustes: { theme_primary, theme_mode }
-        },
-        { onConflict: 'negocio_id' }
-      );
-
-    if (error) throw error;
-
-    aplicarTema(theme_primary, theme_mode);
-    document.getElementById('status').textContent = 'Guardado ✅';
-  } catch (err) {
-    console.error('Error al guardar configuración:', err.message || err);
-    document.getElementById('status').textContent = 'Error al guardar ❌';
-  }
-}
-
-// Eventos
-document.getElementById('btn-guardar').addEventListener('click', guardarConfig);
-
-// Cambiar modo rápido desde el botón
-document.getElementById('theme-toggle')?.addEventListener('click', () => {
-  const select = document.getElementById('theme-mode');
-  const next = select.value === 'light' ? 'dark' : 'light';
-  select.value = next;
-  aplicarTema(document.getElementById('theme-primary').value, next);
-});
-
-// Cargar configuración al iniciar
-document.addEventListener('DOMContentLoaded', cargarConfig);
