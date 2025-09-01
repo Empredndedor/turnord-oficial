@@ -4,11 +4,21 @@ let negocioId; // Se obtendrá del usuario autenticado
 
 async function getNegocioId() {
   if (negocioId) return negocioId;
+
   const { data: { user } } = await supabase.auth.getUser();
+
   if (user && user.user_metadata && user.user_metadata.negocio_id) {
     negocioId = user.user_metadata.negocio_id;
     return negocioId;
   }
+
+  // Fallback to localStorage
+  const businessIdFromStorage = localStorage.getItem('businessId');
+  if (businessIdFromStorage) {
+    negocioId = businessIdFromStorage;
+    return negocioId;
+  }
+
   alert('No se pudo obtener el ID del negocio. Por favor, inicie sesión de nuevo.');
   window.location.replace('login.html');
   return null;
@@ -494,8 +504,6 @@ async function generarNuevoTurno() {
 
 // Cargar turnos en espera
 async function cargarTurnos() {
-  console.log("cargarTurnos llamada");
-
   const hoy = new Date().toISOString().slice(0, 10);
 
   // Buscar si hay un turno actualmente en atención
@@ -508,12 +516,14 @@ async function cargarTurnos() {
     .order('started_at', { ascending: true })
     .limit(1);
 
+
   // Cargar cola de espera
   const { data, error } = await supabase
     .from('turnos')
     .select('*')
     .eq('estado', 'En espera')
     .eq('negocio_id', negocioId)
+    .eq('fecha', hoy)
     .order('orden', { ascending: true })
     .order('created_at', { ascending: true });
 
