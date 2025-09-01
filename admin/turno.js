@@ -117,6 +117,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Listener para reordenar turnos
   document.getElementById('listaEspera')?.addEventListener('click', handleReorderClick);
+
+  // Listener para abrir modal de pago
+  document.getElementById('listaAtencion')?.addEventListener('click', (e) => {
+    const card = e.target.closest('.turn-card-atencion');
+    if (card && card.dataset.id) {
+      abrirModalPago(card.dataset.id);
+    }
+  });
+
+  // Listener para el form de pago
+  document.getElementById('formPago')?.addEventListener('submit', guardarPago);
+
   const overlay = document.getElementById('sidebar-overlay');
   
   mobileMenuButton?.addEventListener('click', toggleMobileMenu);
@@ -664,7 +676,8 @@ async function cargarTurnos() {
     listaAtencion.innerHTML = '';
     (enAtencion || []).forEach(t => {
       const div = document.createElement('div');
-      div.className = 'bg-green-50 dark:bg-green-900/30 p-4 rounded-lg shadow-sm border border-green-100 dark:border-green-800 transition-all';
+      div.className = 'turn-card-atencion bg-green-50 dark:bg-green-900/30 p-4 rounded-lg shadow-sm border border-green-100 dark:border-green-800 transition-all cursor-pointer hover:shadow-md';
+      div.dataset.id = t.id;
       div.innerHTML = `
         <div class="flex justify-between items-start">
           <span class="text-2xl font-bold text-green-700 dark:text-green-400">${t.turno}</span>
@@ -952,23 +965,27 @@ function cerrarModal() {
   document.getElementById('formTurno').reset();
 }
 
-// Modal de cobro
-function abrirModalCobro() {
-  console.log("abrirModalCobro llamada");
-  if (!turnoActual) {
-    mostrarNotificacion('No hay turno en espera.', 'warning');
-    return;
+// Modal de pago
+let activeTurnIdForPayment = null;
+
+function abrirModalPago(turnId) {
+  activeTurnIdForPayment = turnId;
+  const modal = document.getElementById('modalPago');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    document.getElementById('montoCobrado').focus();
   }
-  document.getElementById('modalCobro').classList.remove('hidden');
-  document.getElementById('modalCobro').classList.add('flex');
-  document.getElementById('montoCobrado').focus();
 }
 
-function cerrarModalCobro() {
-  console.log("cerrarModalCobro llamada");
-  document.getElementById('modalCobro').classList.add('hidden');
-  document.getElementById('modalCobro').classList.remove('flex');
-  document.getElementById('formCobro').reset();
+function cerrarModalPago() {
+  const modal = document.getElementById('modalPago');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+    document.getElementById('formPago').reset();
+    activeTurnIdForPayment = null;
+  }
 }
 
 // Atender ahora
@@ -990,30 +1007,31 @@ async function atenderAhora() {
   refrescarUI();
 }
 
-// Guardar el cobro e indicar que el turno fue atendido
-async function guardarCobro(event) {
+// Guardar el pago e indicar que el turno fue atendido
+async function guardarPago(event) {
   event.preventDefault();
-  console.log("guardarCobro llamada");
+  if (!activeTurnIdForPayment) return;
 
   const monto = parseFloat(document.getElementById('montoCobrado').value);
-  if (!turnoActual) return;
+  const metodoPago = document.querySelector('input[name="metodo_pago"]:checked').value;
 
   const { error } = await supabase
     .from('turnos')
     .update({
       estado: 'Atendido',
-      monto_cobrado: monto
+      monto_cobrado: monto,
+      metodo_pago: metodoPago
     })
-    .eq('id', turnoActual.id);
+    .eq('id', activeTurnIdForPayment);
 
   if (error) {
-    mostrarNotificacion('Error al guardar cobro: ' + error.message, 'error');
+    mostrarNotificacion('Error al guardar el pago: ' + error.message, 'error');
     console.error(error);
     return;
   }
 
-  cerrarModalCobro();
-  mostrarNotificacion(`Turno ${turnoActual.turno} finalizado con cobro de RD${monto}`, 'success');
+  cerrarModalPago();
+  mostrarNotificacion(`Turno finalizado con cobro de RD$${monto}`, 'success');
   refrescarUI();
 }
 
@@ -1091,8 +1109,6 @@ function mostrarNotificacion(mensaje, tipo = 'info') {
 window.tomarTurno = tomarTurno;
 window.abrirModal = abrirModal;
 window.cerrarModal = cerrarModal;
-window.abrirModalCobro = abrirModalCobro;
-window.cerrarModalCobro = cerrarModalCobro;
-window.guardarCobro = guardarCobro;
+window.cerrarModalPago = cerrarModalPago; // Still needed for the button in the modal
 window.devolverTurno = devolverTurno;
 window.atenderAhora = atenderAhora;
