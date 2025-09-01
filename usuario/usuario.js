@@ -587,9 +587,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   // Event listener para cerrar el modal
   if (btnCerrarModal) {
-    btnCerrarModal.addEventListener('click', () => {
-      cerrarModal();
-    });
+    btnCerrarModal.addEventListener('click', cerrarModal);
   }
 
   // Estado de break inicial

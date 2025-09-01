@@ -122,15 +122,12 @@ async function limpiarHistorialTurnos() {
 
   try {
     btn && (btn.disabled = true, btn.textContent = 'Limpiando...');
-    const hoyLocal = ymdLocal(new Date());
-    const hoyUTC = ymdUTC(new Date());
-
-    // Borrar directamente por negocio y fecha actual (cubriendo UTC y Local)
+    // Borrar todos los turnos que ya no están activos
     const { error: deleteError } = await supabase
       .from('turnos')
       .delete()
       .eq('negocio_id', currentNegocioId)
-      .or(`fecha.eq.${hoyUTC},fecha.eq.${hoyLocal}`);
+      .in('estado', ['Atendido', 'Cancelado', 'No presentado']);
 
     if (deleteError) throw deleteError;
 
