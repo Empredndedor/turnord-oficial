@@ -154,17 +154,11 @@
           Devolver Turno
         </button>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <button onclick="atenderAhora()" class="bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-800 text-white py-3 rounded-xl font-semibold shadow-md transition-all flex items-center justify-center gap-2">
+          <button onclick="atenderAhora()" class="bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-800 text-white py-3 rounded-xl font-semibold shadow-md transition-all flex items-center justify-center gap-2 col-span-2">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c0-1.105.895-2 2-2h4a2 2 0 012 2v5a2 2 0 01-2 2h-4a2 2 0 01-2-2v-5zM7 9h3m-3 4h3" />
             </svg>
-            Atender
-          </button>
-          <button onclick="abrirModalCobro()" class="bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 text-white py-3 rounded-xl font-semibold shadow-md transition-all flex items-center justify-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
-            </svg>
-            Avanzar Turno
+            Atender Siguiente
           </button>
         </div>
         <button onclick="abrirModal()" class="bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 text-white py-3 rounded-xl font-semibold shadow-md transition-all flex items-center justify-center gap-2">
@@ -253,20 +247,20 @@
       </div>
 
       <!-- Modal de cobro -->
-      <div id="modalCobro" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+      <div id="modalPago" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
         <div class="bg-white dark:bg-gray-800 p-6 rounded-xl w-full max-w-sm shadow-xl transform transition-all">
           <div class="flex justify-between items-center mb-4">
             <h2 class="text-xl font-bold dark:text-white flex items-center">
-              <span class="mr-2">💵</span> Ingresar cobro
+              <span class="mr-2">💵</span> Finalizar Turno
             </h2>
-            <button onclick="cerrarModalCobro()" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+            <button onclick="cerrarModalPago()" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
               <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
           </div>
-          <form id="formCobro" onsubmit="guardarCobro(event)">
-            <div class="mb-6">
+          <form id="formPago">
+            <div class="mb-4">
               <label class="block font-medium text-gray-700 dark:text-gray-300 mb-1">Monto cobrado:</label>
               <div class="relative mt-1">
                 <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -276,8 +270,29 @@
               </div>
               <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Ingrese el monto exacto cobrado al cliente.</p>
             </div>
+            <div class="mb-6">
+                <label class="block font-medium text-gray-700 dark:text-gray-300 mb-2">Método de pago:</label>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <input type="radio" name="metodo_pago" id="pago-efectivo" value="Efectivo" class="hidden peer" checked>
+                        <label for="pago-efectivo" class="block cursor-pointer text-center p-2 rounded-lg border border-gray-300 dark:border-gray-600 peer-checked:bg-blue-600 peer-checked:text-white peer-checked:border-blue-600">Efectivo</label>
+                    </div>
+                    <div>
+                        <input type="radio" name="metodo_pago" id="pago-tarjeta" value="Tarjeta" class="hidden peer">
+                        <label for="pago-tarjeta" class="block cursor-pointer text-center p-2 rounded-lg border border-gray-300 dark:border-gray-600 peer-checked:bg-blue-600 peer-checked:text-white peer-checked:border-blue-600">Tarjeta</label>
+                    </div>
+                    <div>
+                        <input type="radio" name="metodo_pago" id="pago-transferencia" value="Transferencia" class="hidden peer">
+                        <label for="pago-transferencia" class="block cursor-pointer text-center p-2 rounded-lg border border-gray-300 dark:border-gray-600 peer-checked:bg-blue-600 peer-checked:text-white peer-checked:border-blue-600">Transferencia</label>
+                    </div>
+                    <div>
+                        <input type="radio" name="metodo_pago" id="pago-otro" value="Otro" class="hidden peer">
+                        <label for="pago-otro" class="block cursor-pointer text-center p-2 rounded-lg border border-gray-300 dark:border-gray-600 peer-checked:bg-blue-600 peer-checked:text-white peer-checked:border-blue-600">Otro</label>
+                    </div>
+                </div>
+            </div>
             <div class="flex justify-end space-x-2">
-              <button type="button" onclick="cerrarModalCobro()" class="bg-gray-300 dark:bg-gray-600 dark:text-gray-200 hover:bg-gray-400 dark:hover:bg-gray-700 px-4 py-2 rounded-lg transition-colors">
+              <button type="button" onclick="cerrarModalPago()" class="bg-gray-300 dark:bg-gray-600 dark:text-gray-200 hover:bg-gray-400 dark:hover:bg-gray-700 px-4 py-2 rounded-lg transition-colors">
                 Cancelar
               </button>
               <button type="submit" class="bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-800 text-white px-4 py-2 rounded-lg transition-colors flex items-center">
