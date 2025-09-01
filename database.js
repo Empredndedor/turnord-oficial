@@ -1,12 +1,10 @@
 
 // database.js
 
-import * as supabasePkg from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.53.0/+esm';
+// Importamos directamente desde la URL de CDN
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
 import Config from './config.js';
-
-// Importamos createClient desde la URL del CDN configurada centralmente
-import { createClient } from Config.getCDN('supabase');
 
 // Validación por si no se carga correctamente
 if (!createClient) {
