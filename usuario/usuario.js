@@ -413,7 +413,7 @@ async function mostrarMensajeConfirmacion(turnoData) {
 
       const { error } = await supabase
         .from('turnos')
-        .delete()
+        .update({ estado: 'Cancelado' })
         .eq('turno', turnoData.turno)
         .eq('negocio_id', negocioId)
         .eq('telefono', telefonoUsuario);
