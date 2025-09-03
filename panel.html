@@ -99,6 +99,29 @@
         </div>
       </div>
 
+      <!-- Turno en Atención -->
+      <div id="turno-en-atencion-card" class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg border-l-4 border-green-500 hidden mb-8">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-xl font-bold text-gray-800 dark:text-gray-100">Turno en Atención</h2>
+          <div id="atencion-timer" class="text-2xl font-bold text-red-500 bg-red-100 dark:bg-red-900/50 px-3 py-1 rounded-lg">--:--</div>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Turno</p>
+            <p id="atencion-turno" class="text-2xl font-bold text-green-600 dark:text-green-400">--</p>
+          </div>
+          <div>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Cliente</p>
+            <p id="atencion-cliente" class="text-lg font-semibold">--</p>
+          </div>
+          <div>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Servicio</p>
+            <p id="atencion-servicio" class="text-lg font-semibold">--</p>
+          </div>
+        </div>
+      </div>
+      <!-- Fin Turno en Atención -->
+
       <!-- Botón limpiar historial -->
       <div class="flex justify-end mb-4">
         <button id="btnLimpiarHistorial" onclick="limpiarHistorialTurnos()" class="bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800 text-white px-4 py-2 rounded">

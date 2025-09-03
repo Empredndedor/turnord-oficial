@@ -3,6 +3,27 @@ import { supabase } from '../database.js';
 import Config from '../config.js';
 
 let negocioId; // Se obtendrá del usuario autenticado
+let atencionInterval = null; // Timer para el turno en atención
+let serviciosCache = {}; // Cache para duraciones de servicios
+
+// Cargar servicios una vez al inicio
+async function cargarServicios() {
+  const currentNegocioId = await getNegocioId();
+  if (!currentNegocioId) return;
+  try {
+    const { data, error } = await supabase
+      .from('servicios')
+      .select('nombre, duracion_min')
+      .eq('negocio_id', currentNegocioId);
+    if (error) throw error;
+    serviciosCache = (data || []).reduce((acc, srv) => {
+      acc[srv.nombre] = srv.duracion_min;
+      return acc;
+    }, {});
+  } catch (error) {
+    console.error("Error cargando la duración de los servicios:", error);
+  }
+}
 
 async function getNegocioId() {
   if (negocioId) return negocioId;
@@ -89,6 +110,7 @@ async function cargarDatos() {
 
     actualizarContadores(turnosHoy);
     actualizarTabla(turnosHoy);
+    actualizarTurnoEnAtencion(turnosHoy);
 
     return turnosHoy;
   } catch (err) {
@@ -185,9 +207,58 @@ function resaltarMenu() {
   });
 }
 
+// Función para actualizar el turno en atención y su timer
+function actualizarTurnoEnAtencion(turnosHoy) {
+  const enAtencion = turnosHoy.find(t => t.estado === 'En atención');
+  const card = document.getElementById('turno-en-atencion-card');
+
+  if (atencionInterval) {
+    clearInterval(atencionInterval);
+    atencionInterval = null;
+  }
+
+  if (enAtencion && card) {
+    card.classList.remove('hidden');
+    document.getElementById('atencion-turno').textContent = enAtencion.turno;
+    document.getElementById('atencion-cliente').textContent = enAtencion.nombre;
+    document.getElementById('atencion-servicio').textContent = enAtencion.servicio;
+
+    const duracionMin = serviciosCache[enAtencion.servicio];
+    const timerEl = document.getElementById('atencion-timer');
+
+    if (duracionMin && enAtencion.started_at && timerEl) {
+      const startTime = new Date(enAtencion.started_at).getTime();
+      const endTime = startTime + duracionMin * 60 * 1000;
+
+      const updateTimer = () => {
+        const ahora = Date.now();
+        const restanteMs = Math.max(0, endTime - ahora);
+
+        if (restanteMs === 0) {
+          timerEl.textContent = '00:00';
+          clearInterval(atencionInterval);
+          return;
+        }
+
+        const minutos = Math.floor(restanteMs / 60000);
+        const segundos = Math.floor((restanteMs % 60000) / 1000);
+        timerEl.textContent = `${String(minutos).padStart(2, '0')}:${String(segundos).padStart(2, '0')}`;
+      };
+
+      updateTimer(); // Llama inmediatamente para no esperar 1 segundo
+      atencionInterval = setInterval(updateTimer, 1000);
+    } else {
+      if (timerEl) timerEl.textContent = '--:--';
+    }
+  } else if (card) {
+    card.classList.add('hidden');
+  }
+}
+
 // Inicialización al cargar la página
 window.addEventListener('DOMContentLoaded', async () => {
   await getNegocioId();
+  await cargarServicios(); // Cargar duración de servicios
   resaltarMenu();
   cargarDatos();
   suscribirseTurnos();

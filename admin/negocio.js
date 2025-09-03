@@ -324,6 +324,10 @@ async function cargarConfiguracion() {
         const el = document.getElementById('limite-turnos');
         if (el) el.value = data.limite_turnos;
       }
+      if (data.mostrar_tiempo_estimado !== undefined) {
+        const el = document.getElementById('mostrar-tiempo-toggle');
+        if (el) el.checked = data.mostrar_tiempo_estimado;
+      }
 
       if (data.dias_operacion && Array.isArray(data.dias_operacion)) {
         const dayNumToName = { 'Domingo': 0, 'Lunes': 1, 'Martes': 2, 'Miércoles': 3, 'Miercoles': 3, 'Jueves': 4, 'Viernes': 5, 'Sábado': 6, 'Sabado': 6 };
@@ -358,6 +362,7 @@ async function guardarConfiguracion(event) {
     const horaCierre = (document.getElementById('hora-cierre')?.value) || null;
     const limiteTurnosRaw = parseInt(document.getElementById('limite-turnos')?.value);
     const limiteTurnos = Number.isNaN(limiteTurnosRaw) ? null : limiteTurnosRaw;
+    const mostrarTiempo = document.getElementById('mostrar-tiempo-toggle')?.checked;
 
     const dayNumToName = { 0: 'Domingo', 1: 'Lunes', 2: 'Martes', 3: 'Miércoles', 4: 'Jueves', 5: 'Viernes', 6: 'Sábado' };
     const diasOperacion = [];
@@ -381,7 +386,8 @@ async function guardarConfiguracion(event) {
         hora_apertura: horaApertura,
         hora_cierre: horaCierre,
         limite_turnos: limiteTurnos,
-        dias_operacion: diasOperacion
+        dias_operacion: diasOperacion,
+        mostrar_tiempo_estimado: mostrarTiempo
       }, { onConflict: 'negocio_id' });
 
     if (error) throw error;
