@@ -81,7 +81,7 @@ function hhmmToMinutes(hhmm) {
 async function obtenerConfig() {
   const { data, error } = await supabase
     .from('configuracion_negocio')
-    .select('hora_apertura, hora_cierre, limite_turnos')
+    .select('hora_apertura, hora_cierre, limite_turnos, mostrar_tiempo_estimado')
     .eq('negocio_id', negocioId)
     .single();
 
@@ -364,45 +364,63 @@ async function calcularTiempoEstimadoTotal(turnoObjetivo = null) {
 }
 
 async function mostrarMensajeConfirmacion(turnoData) {
-  const deadlineKey = getDeadlineKey(turnoData.turno);
-  let deadline = Number(localStorage.getItem(deadlineKey) || 0);
-  if (!deadline || Number.isNaN(deadline) || deadline <= Date.now()) {
-    const minutosEspera = await calcularTiempoEstimadoTotal(turnoData.turno);
-    deadline = Date.now() + (minutosEspera * 60 * 1000);
-    localStorage.setItem(deadlineKey, String(deadline));
-  }
+  // Decide si mostrar el tiempo estimado basado en la configuración. Por defecto es true.
+  const mostrarTiempo = configCache.mostrar_tiempo_estimado !== false;
 
   const mensajeContenedor = document.getElementById('mensaje-turno');
   if (!mensajeContenedor) return;
 
+  // Construir el HTML condicionalmente
+  let htmlTiempoEstimado = '';
+  if (mostrarTiempo) {
+    const deadlineKey = getDeadlineKey(turnoData.turno);
+    let deadline = Number(localStorage.getItem(deadlineKey) || 0);
+    if (!deadline || Number.isNaN(deadline) || deadline <= Date.now()) {
+      const minutosEspera = await calcularTiempoEstimadoTotal(turnoData.turno);
+      deadline = Date.now() + (minutosEspera * 60 * 1000);
+      localStorage.setItem(deadlineKey, String(deadline));
+    }
+    htmlTiempoEstimado = `⏳ Tiempo estimado: <span id="contador-tiempo"></span><br><br>`;
+  }
+
   mensajeContenedor.innerHTML = `
     <div class="bg-green-100 text-green-700 rounded-xl p-4 shadow mt-4 text-sm">
       ✅ Hola <strong>${turnoData.nombre}</strong>, tu turno es <strong>${turnoData.turno}</strong>.<br>
-      ⏳ Tiempo estimado: <span id="contador-tiempo"></span><br><br>
+      ${htmlTiempoEstimado}
       <button id="cancelarTurno" class="bg-red-600 text-white px-3 py-1 mt-2 rounded hover:bg-red-700">
         Cancelar Turno
       </button>
     </div>
   `;
 
-  const tiempoSpan = document.getElementById('contador-tiempo');
-  if (intervaloContador) clearInterval(intervaloContador);
+  // Iniciar el contador solo si se debe mostrar
+  if (mostrarTiempo) {
+    const tiempoSpan = document.getElementById('contador-tiempo');
+    if (intervaloContador) clearInterval(intervaloContador);
 
-  function actualizarContador() {
-    const restante = Math.ceil((deadline - Date.now()) / 1000);
-    const segundosPos = Math.max(0, restante);
-    const minutos = Math.floor(segundosPos / 60);
-    const segundos = segundosPos % 60;
-    if (tiempoSpan) tiempoSpan.textContent = `${minutos} min ${segundos < 10 ? '0' : ''}${segundos} seg`;
+    const deadlineKey = getDeadlineKey(turnoData.turno);
+    const deadline = Number(localStorage.getItem(deadlineKey) || 0);
 
-    if (restante <= 0) {
-      if (tiempoSpan) tiempoSpan.textContent = '🎉 Prepárate, tu turno está muy cerca.';
-      clearInterval(intervaloContador);
+    function actualizarContador() {
+      const restante = Math.ceil((deadline - Date.now()) / 1000);
+      const segundosPos = Math.max(0, restante);
+      const minutos = Math.floor(segundosPos / 60);
+      const segundos = segundosPos % 60;
+      if (tiempoSpan) tiempoSpan.textContent = `${minutos} min ${segundos < 10 ? '0' : ''}${segundos} seg`;
+
+      if (restante <= 0) {
+        if (tiempoSpan) tiempoSpan.textContent = '🎉 Prepárate, tu turno está muy cerca.';
+        clearInterval(intervaloContador);
+      }
+    }
+
+    if (deadline > 0) {
+        actualizarContador();
+        intervaloContador = setInterval(actualizarContador, 1000);
+    } else {
+        if (tiempoSpan) tiempoSpan.textContent = 'Calculando...';
     }
   }
-
-  actualizarContador();
-  intervaloContador = setInterval(actualizarContador, 1000);
 
   // Cancelar turno
   const cancelarBtn = document.getElementById('cancelarTurno');

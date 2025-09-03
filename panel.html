@@ -74,7 +74,7 @@
         <a href="panel.html" class="block hover:text-white rounded px-3 py-2">Inicio</a>
         <a href="turno.html" class="block bg-white text-gray-900 font-semibold rounded px-3 py-2 shadow">Turnos</a>
         <a href="negocio.html" class="block hover:text-white rounded px-3 py-2">Mi negocio</a>
-        <a href="configuracion.html" class="block hover:text-white rounded px-3 py-2">Configuración</a>
+        <a href="configuracion.html" class="block hover:text-white rounded px-3 py-2 hidden">Configuración</a>
         <a href="cierre.html" id="cerrarSesion" class="block hover:text-red-400 mt-6 rounded px-3 py-2">Cerrar sesión</a>
       </nav>
     </aside>
@@ -98,6 +98,29 @@
           <p id="turnosDia" class="text-3xl font-bold text-purple-600 dark:text-purple-400 mt-2">0</p>
         </div>
       </div>
+
+      <!-- Turno en Atención -->
+      <div id="turno-en-atencion-card" class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg border-l-4 border-green-500 hidden mb-8">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-xl font-bold text-gray-800 dark:text-gray-100">Turno en Atención</h2>
+          <div id="atencion-timer" class="text-2xl font-bold text-red-500 bg-red-100 dark:bg-red-900/50 px-3 py-1 rounded-lg">--:--</div>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Turno</p>
+            <p id="atencion-turno" class="text-2xl font-bold text-green-600 dark:text-green-400">--</p>
+          </div>
+          <div>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Cliente</p>
+            <p id="atencion-cliente" class="text-lg font-semibold">--</p>
+          </div>
+          <div>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Servicio</p>
+            <p id="atencion-servicio" class="text-lg font-semibold">--</p>
+          </div>
+        </div>
+      </div>
+      <!-- Fin Turno en Atención -->
 
       <!-- Botón limpiar historial -->
       <div class="flex justify-end mb-4">
