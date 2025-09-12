@@ -582,6 +582,13 @@ async function tomarTurnoSimple(nombre, telefono, servicio) {
 
   turnoAsignado = nuevoTurno;
   await mostrarMensajeConfirmacion({ nombre, turno: nuevoTurno });
+
+  // Enviar notificación de confirmación
+  enviarNotificacion(
+    `¡Turno ${nuevoTurno} confirmado!`,
+    `Hola ${nombre}, hemos registrado tu turno. Te notificaremos cuando se acerque tu momento.`
+  );
+
   const form = document.getElementById('formRegistroNegocio');
   if (form) form.reset();
   cerrarModal();
@@ -590,6 +597,26 @@ async function tomarTurnoSimple(nombre, telefono, servicio) {
   if (btnTomarTurno) btnTomarTurno.disabled = true;
 
   await actualizarTurnoActualYConteo();
+}
+
+// ===== Lógica de Notificaciones =====
+async function solicitarPermisoNotificaciones() {
+  if (!('Notification' in window)) {
+    console.log("Este navegador no soporta notificaciones de escritorio");
+    return;
+  }
+  if (Notification.permission === 'granted') {
+    return;
+  }
+  if (Notification.permission !== 'denied') {
+    await Notification.requestPermission();
+  }
+}
+
+function enviarNotificacion(titulo, cuerpo) {
+  if ('Notification' in window && Notification.permission === 'granted') {
+    new Notification(titulo, { body: cuerpo });
+  }
 }
 
 // ===== Inicialización =====
@@ -603,6 +630,10 @@ window.addEventListener('DOMContentLoaded', async () => {
   const form = document.getElementById('formRegistroNegocio');
   const btnCerrarModal = document.getElementById('btn-cerrar-modal');
 
+  // Solicitar permiso de notificación al tomar turno
+  if (btnTomarTurno) {
+    btnTomarTurno.addEventListener('click', solicitarPermisoNotificaciones);
+  }
   // Event listener para cerrar el modal
   if (btnCerrarModal) {
     btnCerrarModal.addEventListener('click', cerrarModal);
@@ -706,30 +737,56 @@ supabase
 
 // ... existing code ...   telefonoUsuario = localStorage.getItem('telefonoUsuario');
         if (telefonoUsuario) {
-          const { data, error } = await supabase
+          const { data: miTurno, error: miTurnoError } = await supabase
             .from('turnos')
-            .select('*')
+            .select('turno, nombre, estado')
             .eq('negocio_id', negocioId)
             .eq('telefono', telefonoUsuario)
             .order('created_at', { ascending: false })
             .limit(1)
             .single();
 
-          if (!error && data && data.estado !== 'En espera') {
-            const cont = document.getElementById('mensaje-turno');
-            if (cont) {
-              cont.innerHTML = `
-                <div class="bg-blue-100 text-blue-700 rounded-xl p-4 shadow mt-4 text-sm">
-                  ✅ Tu turno <strong>${data.turno}</strong> ha sido ${data.estado.toLowerCase()}.
-                </div>
-              `;
+          if (miTurno) {
+            // Caso 1: El turno del usuario cambió a 'En atención'
+            if (miTurno.estado === 'En atención') {
+              enviarNotificacion(
+                `¡Es tu turno, ${miTurno.nombre}!`,
+                `Tu turno ${miTurno.turno} está siendo llamado ahora.`
+              );
+
+            // Caso 2: El turno del usuario ya no está activo (Atendido, Cancelado, etc.)
+            } else if (miTurno.estado !== 'En espera') {
+              const cont = document.getElementById('mensaje-turno');
+              if (cont) {
+                cont.innerHTML = `
+                  <div class="bg-blue-100 text-blue-700 rounded-xl p-4 shadow mt-4 text-sm">
+                    ✅ Tu turno <strong>${miTurno.turno}</strong> ha sido ${miTurno.estado.toLowerCase()}.
+                  </div>
+                `;
+              }
+              if (miTurno.estado === 'Atendido') {
+                enviarNotificacion('¡Gracias por tu visita!', `Tu turno ${miTurno.turno} ha finalizado.`);
+              }
+
+              // Limpiar estado del usuario
+              turnoAsignado = null;
+              if (btnTomarTurno) btnTomarTurno.disabled = false;
+              if (intervaloContador) clearInterval(intervaloContador);
+              localStorage.removeItem(getDeadlineKey(miTurno.turno));
+              localStorage.removeItem('telefonoUsuario');
+              telefonoUsuario = null;
+
+            // Caso 3: El turno sigue 'En espera', verificar posición en la cola
+            } else {
+              const posicion = await obtenerPosicionEnFila(miTurno.turno);
+              if (posicion === 1) {
+                enviarNotificacion('¡Ya casi es tu turno!', 'Solo queda 1 persona delante. ¡Puedes ir viniendo!');
+              } else if (posicion > 1) {
+                enviarNotificacion('La fila ha avanzado', `Ahora tienes ${posicion} personas delante.`);
+              } else if (posicion === 0) {
+                enviarNotificacion('¡Eres el siguiente!', 'Prepárate, te toca a ti después del turno actual.');
+              }
             }
-            turnoAsignado = null;
-            if (btnTomarTurno) btnTomarTurno.disabled = false;
-            if (intervaloContador) clearInterval(intervaloContador);
-            localStorage.removeItem(getDeadlineKey(data.turno));
-            localStorage.removeItem('telefonoUsuario');
-            telefonoUsuario = null;
           }
         }
         await actualizarTurnoActualYConteo();
